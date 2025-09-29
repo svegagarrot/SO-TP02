@@ -1,4 +1,4 @@
-#include <rtc.h>
+#include "rtc.h"
 
 uint8_t getTime(uint8_t reg) {
     if (reg != RTC_SECONDS && reg != RTC_MINUTES && reg != RTC_HOURS &&

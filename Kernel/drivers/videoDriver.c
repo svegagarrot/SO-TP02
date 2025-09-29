@@ -1,5 +1,5 @@
-#include "../include/font.h"
-#include "../include/videoDriver.h"
+#include "font.h"
+#include "videoDriver.h"
 
 static int isSpecialChar(char c);
 static void video_scrollUp();

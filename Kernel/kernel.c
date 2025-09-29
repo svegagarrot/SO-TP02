@@ -3,9 +3,9 @@
 #include <lib.h>
 #include <moduleLoader.h>
 #include <naiveConsole.h>
-#include "include/videoDriver.h"
-#include "include/keyboardDriver.h"
-#include "include/idtLoader.h"
+#include "videoDriver.h"
+#include "keyboardDriver.h"
+#include <idtLoader.h>
 
 extern uint8_t text;
 extern uint8_t rodata;

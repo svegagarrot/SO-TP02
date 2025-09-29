@@ -1,11 +1,11 @@
-#include <syscalls_lib.h>
-#include <keyboardDriver.h>
-#include "include/videoDriver.h"
-#include <audioDriver.h>
-#include <rtc.h>
+#include "syscalls_lib.h"
+#include "keyboardDriver.h"
+#include "videoDriver.h"
+#include "audioDriver.h"
+#include "rtc.h"
 #include <stddef.h>
-#include <interrupts.h>
-#include <time.h>
+#include "interrupts.h"
+#include "time.h"
 #include "keystate.h"
 
 #define STDIN 0

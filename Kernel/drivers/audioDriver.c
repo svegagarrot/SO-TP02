@@ -1,4 +1,4 @@
-#include "../include/audioDriver.h"
+#include <audioDriver.h>
 
 void audio_play(uint32_t nFrequence) {
  	uint32_t div;
