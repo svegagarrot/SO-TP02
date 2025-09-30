@@ -1,5 +1,7 @@
 include Makefile.inc
 
+GCCFLAGS += -DUSE_SIMPLE_MM
+
 KERNEL=kernel.bin
 SOURCES=$(wildcard *.c)
 SOURCES_DRIVERS=$(wildcard drivers/*.c)

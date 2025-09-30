@@ -20,6 +20,17 @@ typedef struct {
     uint64_t rax, rbx, rcx, rdx, rbp, rdi, rsi, r8, r9, r10, r11, r12, r13, r14, r15, rip, rsp, rflags;
 } CPURegisters;
 
+typedef struct {
+    uint64_t total_bytes;
+    uint64_t used_bytes;
+    uint64_t free_bytes;
+    uint64_t largest_free_block;
+    uint64_t allocations;
+    uint64_t frees;
+    uint64_t failed_allocations;
+} memory_info_t;
+
+
 extern int current_font_scale;
 
 void putchar(char c);
@@ -32,6 +43,9 @@ int strcmp(const char *s1, const char *s2);
 int atoi(const char *str);
 char *fgets(char *s, int n, int fd);
 void clearScreen();
+void *malloc(size_t size);
+void free(void *ptr);
+int memory_info(memory_info_t *info);
 int sprintf(char *str, const char *fmt, ...);
 int try_getchar(char *c);
 void getTime(char *buffer);

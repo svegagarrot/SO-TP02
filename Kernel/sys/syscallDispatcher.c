@@ -18,6 +18,9 @@ static SyscallHandler syscallHandlers[] = {
     (SyscallHandler)syscall_is_key_pressed,
     (SyscallHandler)syscall_shutdown,
     (SyscallHandler)syscall_get_screen_dimensions,
+    (SyscallHandler)syscall_malloc,
+    (SyscallHandler)syscall_free,
+    (SyscallHandler)syscall_meminfo,
 };
 
 #define SYSCALLS_COUNT (sizeof(syscallHandlers) / sizeof(syscallHandlers[0]))

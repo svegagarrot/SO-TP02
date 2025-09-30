@@ -5,6 +5,7 @@
 #include <naiveConsole.h>
 #include "videoDriver.h"
 #include "keyboardDriver.h"
+#include "mm.h"
 #include <idtLoader.h>
 
 extern uint8_t text;
@@ -63,6 +64,7 @@ void * initializeKernelBinary()
 	ncNewline();
 
 	clearBSS(&bss, &endOfKernel - &bss);
+	mm_init_default();
 
 	ncPrint("  text: 0x");
 	ncPrintHex((uint64_t)&text);

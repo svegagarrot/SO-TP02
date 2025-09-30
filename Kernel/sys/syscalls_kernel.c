@@ -4,6 +4,7 @@
 #include "audioDriver.h"
 #include "rtc.h"
 #include <stddef.h>
+#include <lib.h>
 #include "interrupts.h"
 #include "time.h"
 #include "keystate.h"
@@ -134,5 +135,30 @@ uint64_t syscall_get_screen_dimensions(uint64_t *width, uint64_t *height) {
     }
     *width = video_get_width();
     *height = video_get_height();
+    return 1;
+}
+uint64_t syscall_malloc(uint64_t size, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    if (size == 0) {
+        return 0;
+    }
+    void *ptr = mm_alloc(size);
+    return (uint64_t)ptr;
+}
+
+uint64_t syscall_free(uint64_t address, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    if (address == 0) {
+        return 0;
+    }
+    mm_free((void *)address);
+    return 1;
+}
+
+uint64_t syscall_meminfo(uint64_t user_addr, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    if (user_addr == 0) {
+        return 0;
+    }
+    mm_stats_t stats;
+    mm_get_stats(&stats);
+    memcpy((void *)user_addr, &stats, sizeof(stats));
     return 1;
 }

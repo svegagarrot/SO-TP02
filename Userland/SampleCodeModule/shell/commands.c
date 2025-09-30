@@ -5,6 +5,7 @@
 #include "../include/game.h"
 
 extern void _invalidOp();
+extern int64_t test_mm(uint64_t argc, char *argv[]);
 
 const TShellCmd shellCmds[] = {
     {"help", helpCmd, ": Muestra los comandos disponibles\n"},
@@ -13,6 +14,7 @@ const TShellCmd shellCmds[] = {
     {"clear", clearCmd, ": Limpia la pantalla\n"},
     {"time", timeCmd, ": Muestra la hora actual\n"},
     {"font-size", fontSizeCmd, ": Cambia el tamanio de la fuente\n"},
+    {"testmm", testMMCmd, ": Ejecuta el stress test de memoria. Uso: testmm <max_mem>\n"},
     {"exceptions", exceptionCmd, ": Testear excepciones. Ingrese: exceptions [zero/invalidOpcode] para testear alguna operacion\n"},
     {"jugar", gameCmd, ": Inicia el modo juego\n"},
     {"regs", regsCmd, ": Muestra los ultimos 18 registros de la CPU\n"},
@@ -156,6 +158,22 @@ int exceptionCmd(int argc, char * argv[]) {
 
     return OK;
 }
+
+int testMMCmd(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Uso: testmm <max_mem>\n");
+        return CMD_ERROR;
+    }
+
+    int64_t result = test_mm(argc - 1, argv + 1);
+    if (result == -1) {
+        printf("testmm fallo\n");
+        return CMD_ERROR;
+    }
+
+    return OK;
+}
+
 
 int gameCmd(int argc, char *argv[]) {
     game_main_screen();

@@ -11,18 +11,23 @@ typedef struct MM_rq {
   uint32_t size;
 } mm_rq;
 
-uint64_t test_mm(uint64_t argc, char *argv[]) {
+int64_t test_mm(uint64_t argc, char *argv[]) {
 
   mm_rq mm_rqs[MAX_BLOCKS];
   uint8_t rq;
   uint32_t total;
   uint64_t max_memory;
+  int64_t parsed_max_memory;
 
   if (argc != 1)
     return -1;
 
-  if ((max_memory = satoi(argv[0])) <= 0)
+  parsed_max_memory = satoi(argv[0]);
+
+  if (parsed_max_memory <= 0)
     return -1;
+
+  max_memory = (uint64_t)parsed_max_memory;
 
   while (1) {
     rq = 0;

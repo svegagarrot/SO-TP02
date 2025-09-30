@@ -15,6 +15,9 @@ GLOBAL sys_regs
 GLOBAL sys_is_key_pressed
 GLOBAL sys_shutdown
 GLOBAL sys_screenDims
+GLOBAL sys_malloc
+GLOBAL sys_free
+GLOBAL sys_meminfo
 
 
 sys_read:
@@ -148,6 +151,32 @@ sys_screenDims:
     push rbp
     mov rbp, rsp
     mov rax, 14    
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+sys_malloc:
+    push rbp
+    mov rbp, rsp
+    mov rax, 15
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_free:
+    push rbp
+    mov rbp, rsp
+    mov rax, 16
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_meminfo:
+    push rbp
+    mov rbp, rsp
+    mov rax, 17
     int 0x80
     mov rsp, rbp
     pop rbp

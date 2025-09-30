@@ -19,4 +19,7 @@ uint64_t sys_is_key_pressed(unsigned char scancode);
 uint64_t sys_shutdown();
 int sys_screenDims(uint64_t *width, uint64_t *height);
 
+void *sys_malloc(uint64_t size);
+uint64_t sys_free(void *ptr);
+uint64_t sys_meminfo(void *info);
 #endif

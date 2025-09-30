@@ -472,3 +472,19 @@ void shutdown() {
 int getScreenDims(uint64_t *width, uint64_t *height) {
     return sys_screenDims(width, height);
 }
+void *malloc(size_t size) {
+    return (void *)sys_malloc(size);
+}
+
+void free(void *ptr) {
+    if (ptr != NULL) {
+        sys_free(ptr);
+    }
+}
+
+int memory_info(memory_info_t *info) {
+    if (info == NULL) {
+        return 0;
+    }
+    return (int)sys_meminfo(info);
+}
