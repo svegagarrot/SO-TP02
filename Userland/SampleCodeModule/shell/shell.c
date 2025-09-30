@@ -36,7 +36,7 @@ void shellLoop() {
 
 void readLine(char *buf, int maxLen) {
     int len = 0;
-    char c;
+    int c;
 
     while (1) {
         c = getchar();
@@ -53,7 +53,7 @@ void readLine(char *buf, int maxLen) {
                 sys_beep(500, 100);
             }
         } else if (len < maxLen-1) {
-            buf[len++] = c;
+            buf[len++] = (char)c;
             putchar(c);
         }
     }

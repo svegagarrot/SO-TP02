@@ -2,7 +2,7 @@
 #define LIB_H
 
 #define BUFFER_SIZE 256
-#define stdin 0 
+#define stdin ((FILE*)0) 
 #define REGISTERS_CANT 18
 
 #define RTC_SECONDS 0x00
@@ -14,7 +14,10 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <math.h> 
+#include <math.h>
+
+// Definición básica de FILE para compatibilidad
+typedef struct FILE FILE; 
 
 typedef struct {
     uint64_t rax, rbx, rcx, rdx, rbp, rdi, rsi, r8, r9, r10, r11, r12, r13, r14, r15, rip, rsp, rflags;
@@ -33,15 +36,15 @@ typedef struct {
 
 extern int current_font_scale;
 
-void putchar(char c);
-char getchar();
+int putchar(int c);
+int getchar(void);
 int scanf(const char *fmt, ...);
 int printf(const char *fmt, ...);
-int strlen(const char *s);
-void strncpy(char *dest, const char *src, size_t n);
+size_t strlen(const char *s);
+char *strncpy(char *dest, const char *src, size_t n);
 int strcmp(const char *s1, const char *s2);
 int atoi(const char *str);
-char *fgets(char *s, int n, int fd);
+char *fgets(char *s, int n, FILE *stream);
 void clearScreen();
 void *malloc(size_t size);
 void free(void *ptr);

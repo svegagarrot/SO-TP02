@@ -22,7 +22,7 @@ void game_main_screen() {
     int total_height = num_lines * line_height;
     int startY = (SCREEN_HEIGHT - total_height) / 2;
     for (int i = 0; i < num_lines; i++) {
-        int text_len = strlen(lines[i]);
+        size_t text_len = strlen(lines[i]);
         int text_width = text_len * font_width;
         int x = (SCREEN_WIDTH - text_width) / 2;
         int y = startY + i * line_height;

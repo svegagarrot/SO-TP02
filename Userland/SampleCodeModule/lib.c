@@ -6,11 +6,13 @@ int get_regs(uint64_t *r) {
     return sys_regs(r);
 }
 
-void putchar(char c) {
-    sys_write(1, &c, 1);
+int putchar(int c) {
+    char ch = (char)c;
+    sys_write(1, &ch, 1);
+    return c;
 }
 
-char getchar(void) {
+int getchar(void) {
     char c;
     int n;
 
@@ -18,22 +20,22 @@ char getchar(void) {
         n = sys_read(0, &c, 1);
     } while (n == 0);
 
-    return c;
+    return (int)c;
 }
 
 int is_key_pressed_syscall(unsigned char scancode) {
     return sys_is_key_pressed(scancode);
 }
 
-int strlen(const char *s) {
-    int len = 0;
+size_t strlen(const char *s) {
+    size_t len = 0;
     while (s[len] != '\0') {
         len++;
     }
     return len;
 }
 
-char *fgets(char *s, int n, int fd) {
+char *fgets(char *s, int n, FILE *stream) {
     int i = 0;
     char c;
 
@@ -42,7 +44,7 @@ char *fgets(char *s, int n, int fd) {
     while (i < n - 1) {
         int read;
         do {
-            read = sys_read(fd, &c, 1);
+            read = sys_read(0, &c, 1);  // stdin siempre es fd 0
         } while (read == 0);  
 
         s[i++] = c;
@@ -53,13 +55,14 @@ char *fgets(char *s, int n, int fd) {
     return s;
 }
 
-void strncpy(char *dest, const char *src, size_t n) {
+char *strncpy(char *dest, const char *src, size_t n) {
     size_t i = 0;
     while (i < n - 1 && src[i] != '\0') {
         dest[i] = src[i];
         i++;
     }
     dest[i] = '\0';
+    return dest;
 }
 
 int strcmp(const char *s1, const char *s2) {
