@@ -1,81 +1,158 @@
-#include "time.h"
 #include "scheduler.h"
-#include <stdint.h>
+#include "time.h"
+#include "interrupts.h"
 
-#define QUANTUM_TICKS 18  // 1 segundo (18 ticks = 1 segundo)
-#define MAX_PROCESSES 10
+#define QUANTUM_TICKS 18
 
-extern void _hlt();
+static process_queue_t ready_queue;
+static process_queue_t blocked_queue;
+static process_queue_t finished_queue;
 
-typedef struct {
-    uint64_t stack_pointer;
-    uint64_t pid;
-    uint8_t state;  // 0=ready, 1=running, 2=blocked
-} process_t;
-
-static process_t processes[MAX_PROCESSES];
-static uint8_t current_pid = 0;
-static uint8_t process_count = 0;
+static process_t *current_process = NULL;
+static process_t *idle_process_pcb = NULL;
 static uint64_t last_switch_tick = 0;
 
-static uint64_t idle_stack[1024];  // Stack para el proceso idle
-static uint8_t idle_pid = 0xFF;    // PID especial para idle
-
-void init_scheduler() {
-    // Crear stack para idle con frame válido
-    uint64_t idle_rsp = (uint64_t)&idle_stack[1023];
-    
-    // Simular un stack frame para idle_process
-    idle_stack[1023] = (uint64_t)idle_process;  // RIP
-    idle_stack[1022] = 0;                       // RFLAGS
-    idle_stack[1021] = idle_rsp;                // RSP
-    
-    processes[0].stack_pointer = idle_rsp - 24; // Ajustar para el frame
-    processes[0].pid = idle_pid;
-    processes[0].state = 1;
-    process_count = 1;
-    current_pid = 0;
+static void idle_process_entry(void *unused) {
+    (void)unused;
+    while (1) {
+        _hlt();
+    }
 }
 
+static void save_context(process_t *process, uint64_t current_rsp) {
+    if (process == NULL) {
+        return;
+    }
 
-// Función que llama el timer interrupt
+    process->rsp = current_rsp;
+    process->rbp = ((uint64_t *)current_rsp)[10];
+
+    switch (process->state) {
+        case PROCESS_STATE_RUNNING:
+            if (process != idle_process_pcb) {
+                process->state = PROCESS_STATE_READY;
+                process_queue_push(&ready_queue, process);
+            }
+            break;
+        case PROCESS_STATE_BLOCKED:
+            process_queue_push(&blocked_queue, process);
+            break;
+        case PROCESS_STATE_FINISHED:
+            process_queue_push(&finished_queue, process);
+            break;
+        default:
+            break;
+    }
+}
+
+void init_scheduler(void) {
+    process_system_init();
+    process_queue_init(&ready_queue);
+    process_queue_init(&blocked_queue);
+    process_queue_init(&finished_queue);
+
+    idle_process_pcb = process_create("idle",
+                                      idle_process_entry,
+                                      NULL,
+                                      -1,
+                                      PROCESS_BACKGROUND,
+                                      PROCESS_TYPE_KERNEL,
+                                      NULL);
+
+    if (idle_process_pcb != NULL) {
+        idle_process_pcb->state = PROCESS_STATE_RUNNING;
+        current_process = idle_process_pcb;
+        last_switch_tick = ticks_elapsed();
+    }
+}
+
 uint64_t schedule(uint64_t current_rsp) {
-    uint64_t current_tick = ticks_elapsed();
-    
-    // Solo hacer context switch cada QUANTUM_TICKS
-    if (current_tick - last_switch_tick < QUANTUM_TICKS) {
-        return current_rsp;  // No hay switch, devolver mismo SP
+    if (current_process == NULL) {
+        return current_rsp;
     }
-    
-    // Guardar contexto del proceso actual
-    processes[current_pid].stack_pointer = current_rsp;
-    
-    // Buscar siguiente proceso listo
-    uint8_t next_pid = (current_pid + 1) % process_count;
-    while (processes[next_pid].state != 0 && next_pid != current_pid) {
-        next_pid = (next_pid + 1) % process_count;
+
+    uint64_t now = ticks_elapsed();
+
+    if (current_process == idle_process_pcb && process_queue_is_empty(&ready_queue)) {
+        last_switch_tick = now;
+        return current_rsp;
     }
-    
-    // Si no hay procesos listos, usar idle
-    if (processes[next_pid].state != 0) {
-        // Cambiar a idle
-        processes[current_pid].stack_pointer = current_rsp;
-        processes[0].state = 1;  // idle siempre está listo
-        current_pid = 0;
-        return processes[0].stack_pointer;
+
+    if (current_process->state == PROCESS_STATE_RUNNING && process_queue_is_empty(&ready_queue)) {
+        if ((now - last_switch_tick) < QUANTUM_TICKS) {
+            return current_rsp;
+        }
     }
-    
-    // Cambiar al siguiente proceso
-    processes[current_pid].state = 0;  // ready
-    processes[next_pid].state = 1;     // running
-    current_pid = next_pid;
-    last_switch_tick = current_tick;
-    
-    return processes[current_pid].stack_pointer;
+
+    save_context(current_process, current_rsp);
+
+    process_t *next = process_queue_pop(&ready_queue);
+    if (next == NULL) {
+        next = idle_process_pcb;
+    }
+
+    next->state = PROCESS_STATE_RUNNING;
+    current_process = next;
+    last_switch_tick = now;
+
+    return next->rsp;
 }
 
-void idle_process() {
-    while(1) {
-        _hlt();  // Halt hasta próxima interrupción
-    }
+process_t *scheduler_current_process(void) {
+    return current_process;
 }
+
+void scheduler_add_process(process_t *process) {
+    if (process == NULL || process == idle_process_pcb) {
+        return;
+    }
+
+    process->state = PROCESS_STATE_READY;
+    process_queue_push(&ready_queue, process);
+}
+
+process_t *scheduler_spawn_process(const char *name,
+                                   process_entry_point_t entry_point,
+                                   void *entry_arg,
+                                   int priority,
+                                   process_mode_t mode,
+                                   process_type_t type,
+                                   process_t *parent) {
+    process_t *process = process_create(name, entry_point, entry_arg, priority, mode, type, parent);
+    if (process == NULL) {
+        return NULL;
+    }
+    scheduler_add_process(process);
+    return process;
+}
+
+void scheduler_block_current(void) {
+    if (current_process == NULL || current_process == idle_process_pcb) {
+        return;
+    }
+
+    current_process->state = PROCESS_STATE_BLOCKED;
+}
+
+void scheduler_unblock_process(process_t *process) {
+    if (process == NULL) {
+        return;
+    }
+
+    process_queue_remove(&blocked_queue, process);
+    process->state = PROCESS_STATE_READY;
+    process_queue_push(&ready_queue, process);
+}
+
+void scheduler_finish_current(void) {
+    if (current_process == NULL || current_process == idle_process_pcb) {
+        return;
+    }
+
+    current_process->state = PROCESS_STATE_FINISHED;
+}
+
+process_t *scheduler_collect_finished(void) {
+    return process_queue_pop(&finished_queue);
+}
+
