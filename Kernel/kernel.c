@@ -5,6 +5,7 @@
 #include <naiveConsole.h>
 #include "videoDriver.h"
 #include "keyboardDriver.h"
+#include "scheduler.h"
 #include "mm.h"
 #include <idtLoader.h>
 
@@ -65,6 +66,7 @@ void * initializeKernelBinary()
 
 	clearBSS(&bss, &endOfKernel - &bss);
 	mm_init_default();
+	init_scheduler();
 
 	ncPrint("  text: 0x");
 	ncPrintHex((uint64_t)&text);

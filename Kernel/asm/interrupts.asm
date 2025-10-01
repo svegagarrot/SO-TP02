@@ -22,6 +22,7 @@ EXTERN exceptionDispatcher
 EXTERN syscallDispatcher
 EXTERN getStackBase
 EXTERN timer_handler
+EXTERN schedule
 
 SECTION .text
 
