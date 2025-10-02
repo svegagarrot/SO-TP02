@@ -8,6 +8,9 @@
 #include "interrupts.h"
 #include "time.h"
 #include "keystate.h"
+#include "process.h"
+#include "scheduler.h"
+#include "mm.h"
 
 #define STDIN 0
 #define STDOUT 1
@@ -161,4 +164,38 @@ uint64_t syscall_meminfo(uint64_t user_addr, uint64_t unused1, uint64_t unused2,
     mm_get_stats(&stats);
     memcpy((void *)user_addr, &stats, sizeof(stats));
     return 1;
+}
+
+uint64_t syscall_create_process(char *name, void *function, char *argv[]) {
+    process_t *process = process_create(
+        name != NULL ? name : "user_process",
+        (process_entry_point_t) function,
+        (void *)argv,
+        0,
+        PROCESS_FOREGROUND,
+        PROCESS_TYPE_USER,
+        NULL
+    );
+    if (process == NULL) {
+        return 0;
+    }
+    scheduler_add_process(process);
+    return process->pid;
+}
+
+uint64_t syscall_kill(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    return scheduler_kill_by_pid(pid);
+}
+
+uint64_t syscall_block(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    process_t *current = scheduler_current_process();
+    if (current == NULL || current->pid != pid) {
+        return 0;
+    }
+    scheduler_block_current();
+    return 1;
+}
+
+uint64_t syscall_unblock(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    return scheduler_unblock_by_pid(pid);
 }

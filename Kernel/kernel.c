@@ -8,6 +8,7 @@
 #include "scheduler.h"
 #include "mm.h"
 #include <idtLoader.h>
+#include "process.h"
 
 extern uint8_t text;
 extern uint8_t rodata;
@@ -108,6 +109,38 @@ int main()
 	ncPrint((char*)sampleDataModuleAddress);
 	ncNewline();
 
-	ncPrint("[Finished]");
+	ncPrint("[Creating shell process]");
+	ncNewline();
+	
+	// Crear proceso para la shell
+	process_t *shell_process = scheduler_spawn_process(
+        "shell",
+        (process_entry_point_t)sampleCodeModuleAddress,
+        NULL,
+        0,
+        PROCESS_FOREGROUND,
+        PROCESS_TYPE_USER,
+        NULL
+    );
+    
+    if (shell_process == NULL) {
+        ncPrint("ERROR: Failed to create shell process");
+        ncNewline();
+        return -1;
+    }
+    
+    ncPrint("Shell process created with PID: ");
+    ncPrintHex(shell_process->pid);
+    ncNewline();
+    ncNewline();
+
+	ncPrint("[Kernel entering idle mode]");
+	ncNewline();
+	
+	// El kernel se queda en idle
+	while(1) {
+		_hlt();
+	}
+	
 	return 0;
 }

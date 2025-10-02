@@ -156,3 +156,63 @@ process_t *scheduler_collect_finished(void) {
     return process_queue_pop(&finished_queue);
 }
 
+process_t *scheduler_find_by_pid(uint64_t pid) {
+    // Buscar en ready queue
+    process_t *current = ready_queue.head;
+    while (current != NULL) {
+        if (current->pid == pid) {
+            return current;
+        }
+        current = current->queue_next;
+    }
+    
+    // Buscar en blocked queue
+    current = blocked_queue.head;
+    while (current != NULL) {
+        if (current->pid == pid) {
+            return current;
+        }
+        current = current->queue_next;
+    }
+    
+    // Buscar en finished queue
+    current = finished_queue.head;
+    while (current != NULL) {
+        if (current->pid == pid) {
+            return current;
+        }
+        current = current->queue_next;
+    }
+    
+    // Buscar en current process
+    if (current_process != NULL && current_process->pid == pid) {
+        return current_process;
+    }
+    
+    return NULL;
+}
+
+int scheduler_unblock_by_pid(uint64_t pid) {
+    process_t *process = scheduler_find_by_pid(pid);
+    if (process == NULL) {
+        return 0;
+    }
+    scheduler_unblock_process(process);
+    return 1;
+}
+
+int scheduler_kill_by_pid(uint64_t pid) {
+    process_t *process = scheduler_find_by_pid(pid);
+    if (process == NULL) {
+        return 0;
+    }
+    
+    // Marcar como terminado y dejar que el scheduler lo limpie
+    process->state = PROCESS_STATE_FINISHED;
+    process_queue_remove(&ready_queue, process);
+    process_queue_remove(&blocked_queue, process);
+    process_queue_push(&finished_queue, process);
+    
+    return 1;
+}
+

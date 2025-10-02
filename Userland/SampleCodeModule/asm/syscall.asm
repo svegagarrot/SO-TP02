@@ -18,6 +18,10 @@ GLOBAL sys_screenDims
 GLOBAL sys_malloc
 GLOBAL sys_free
 GLOBAL sys_meminfo
+GLOBAL sys_create_process
+GLOBAL sys_kill
+GLOBAL sys_block
+GLOBAL sys_unblock
 
 
 sys_read:
@@ -177,6 +181,42 @@ sys_meminfo:
     push rbp
     mov rbp, rsp
     mov rax, 17
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_create_process:
+    push rbp
+    mov rbp, rsp
+    mov rax, 18
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_kill:
+    push rbp
+    mov rbp, rsp
+    mov rax, 19
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_block:
+    push rbp
+    mov rbp, rsp
+    mov rax, 20
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_unblock:
+    push rbp
+    mov rbp, rsp
+    mov rax, 21
     int 0x80
     mov rsp, rbp
     pop rbp

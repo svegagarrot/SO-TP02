@@ -6,6 +6,7 @@
 
 extern void _invalidOp();
 extern int64_t test_mm(uint64_t argc, char *argv[]);
+extern int64_t test_processes(uint64_t argc, char *argv[]);
 
 const TShellCmd shellCmds[] = {
     {"help", helpCmd, ": Muestra los comandos disponibles\n"},
@@ -15,6 +16,7 @@ const TShellCmd shellCmds[] = {
     {"time", timeCmd, ": Muestra la hora actual\n"},
     {"font-size", fontSizeCmd, ": Cambia el tamanio de la fuente\n"},
     {"testmm", testMMCmd, ": Ejecuta el stress test de memoria. Uso: testmm <max_mem>\n"},
+    {"testproceses", testProcesesCmd, ": Ejecuta el stress test de procesos. Uso: testproceses <max_proceses>\n"},
     {"exceptions", exceptionCmd, ": Testear excepciones. Ingrese: exceptions [zero/invalidOpcode] para testear alguna operacion\n"},
     {"jugar", gameCmd, ": Inicia el modo juego\n"},
     {"regs", regsCmd, ": Muestra los ultimos 18 registros de la CPU\n"},
@@ -174,6 +176,21 @@ int testMMCmd(int argc, char *argv[]) {
     return OK;
 }
 
+int testProcesesCmd(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Uso: testproceses <max_proceses>\n");
+        return CMD_ERROR;
+    }
+
+    int64_t result = test_processes(argc - 1, argv + 1);
+
+    if (result == -1) {
+        printf("testproceses fallo\n");
+        return CMD_ERROR;
+    }
+
+    return OK;
+}
 
 int gameCmd(int argc, char *argv[]) {
     game_main_screen();

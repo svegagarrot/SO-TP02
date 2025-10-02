@@ -491,3 +491,23 @@ int memory_info(memory_info_t *info) {
     }
     return (int)sys_meminfo(info);
 }
+
+int64_t my_create_process(char *name, void *function, char *argv[]) {
+    if (function == NULL) {
+        return -1; // Función inválida
+    }
+    
+    return sys_create_process(name, function, argv);
+  }
+
+int64_t my_kill(uint64_t pid) {
+    return sys_kill(pid);
+  }
+  
+  int64_t my_block(uint64_t pid) {
+    return sys_block(pid);
+  }
+  
+  int64_t my_unblock(uint64_t pid) {
+    return sys_unblock(pid);
+  }

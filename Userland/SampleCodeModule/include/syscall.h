@@ -22,4 +22,8 @@ int sys_screenDims(uint64_t *width, uint64_t *height);
 void *sys_malloc(uint64_t size);
 uint64_t sys_free(void *ptr);
 uint64_t sys_meminfo(void *info);
+uint64_t sys_create_process(char *name, void *function, char *argv[]);
+uint64_t sys_kill(uint64_t pid);
+uint64_t sys_block(uint64_t pid);
+uint64_t sys_unblock(uint64_t pid);
 #endif
