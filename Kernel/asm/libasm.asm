@@ -4,6 +4,7 @@ GLOBAL _readTime
 GLOBAL inb
 GLOBAL outb
 GLOBAL outw
+GLOBAL process_user_entry
 
 section .text
 	
@@ -80,4 +81,19 @@ outw:
     
     mov rsp, rbp
     pop rbp
+    ret
+
+;process_user_entry cambia el stack al del usuario, 
+;llama a la función de entrada del proceso con un argumento, 
+;y al terminar, restaura el stack original del kernel.
+process_user_entry:
+    ; rdi = user stack top, rsi = entry point, rdx = argument
+    mov r8, rsp          
+    mov rsp, rdi
+    and rsp, -16          
+    push r8                
+    mov rdi, rdx          
+    call rsi            
+    pop r8               
+    mov rsp, r8           
     ret

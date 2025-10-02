@@ -23,6 +23,7 @@ static void copy_process_name(process_t *process, const char *name) {
     }
 }
 
+//reservo memoria para el stack del proceso
 static void *allocate_stack(uint64_t size) {
     return mm_alloc(size);
 }
@@ -42,6 +43,10 @@ static inline void zero_register_frame(uint64_t *frame_start) {
 static void process_launch(process_t *process) __attribute__((noreturn));
 extern void scheduler_finish_current(void);
 
+extern void process_user_entry(void *stack_top,
+                               process_entry_point_t entry_point,
+                               void *arg);
+
 static void process_exit_trap(void) __attribute__((noreturn));
 
 static void process_exit_trap(void) {
@@ -50,24 +55,26 @@ static void process_exit_trap(void) {
         _hlt();
     }
 }
-
+//arranca el proceso
 static void process_launch(process_t *process) {
     if (process == NULL) {
         process_exit_trap();
     }
 
-    if (process->type == PROCESS_TYPE_USER && process->user_stack_top != NULL) {
-        uint64_t user_stack_aligned = ((uint64_t)process->user_stack_top) & ~((uint64_t)0xF);
-        __asm__ __volatile__("mov %0, %%rsp" :: "r"(user_stack_aligned));
+    if (process->entry_point == NULL) {
+        process_exit_trap();
     }
 
-    if (process->entry_point != NULL) {
+    if (process->type == PROCESS_TYPE_USER && process->user_stack_top != NULL) {
+        process_user_entry(process->user_stack_top, process->entry_point, process->entry_arg);
+    } else {
         process->entry_point(process->entry_arg);
     }
 
     process_exit_trap();
 }
 
+//prepara el contexto inicial del proceso
 static void setup_initial_context(process_t *process) {
     uint8_t *stack_memory = (uint8_t *)process->kernel_stack_base;
     uint64_t *stack_top = (uint64_t *)(stack_memory + PROCESS_KERNEL_STACK_SIZE);
@@ -115,6 +122,7 @@ process_t *process_create(const char *name,
 
     memset(process, 0, sizeof(process_t));
 
+    //reserva memoria para el stack del kernel y del usuario (si es necesario)
     process->kernel_stack_base = allocate_stack(PROCESS_KERNEL_STACK_SIZE);
     if (process->kernel_stack_base == NULL) {
         mm_free(process);
