@@ -9,6 +9,7 @@
 #include "mm.h"
 #include <idtLoader.h>
 #include "process.h"
+#include "interrupts.h"
 
 extern uint8_t text;
 extern uint8_t rodata;
@@ -24,123 +25,75 @@ static void * const sampleDataModuleAddress = (void*)0x500000;
 
 typedef int (*EntryPoint)();
 
-
 void clearBSS(void * bssAddress, uint64_t bssSize)
 {
-	memset(bssAddress, 0, bssSize);
+    memset(bssAddress, 0, bssSize);
 }
 
 void * getStackBase()
 {
-	return (void*)(
-		(uint64_t)&endOfKernel
-		+ PageSize * 8				
-		- sizeof(uint64_t)			
-	);
+    return (void*)(
+        (uint64_t)&endOfKernel
+        + PageSize * 8
+        - sizeof(uint64_t)
+    );
+}
+
+void idle(){
+	while(1){
+		_hlt();
+	}
+}
+
+//DESPUES BORRAR
+static void cpu_pause(volatile uint64_t iters) {
+    while (iters--) { __asm__ __volatile__("pause"); }
+}
+
+static void procA(void *arg) {
+    (void)arg;
+    for (;;) {
+        video_putChar('A', FOREGROUND_COLOR, BACKGROUND_COLOR);
+        cpu_pause(5000000);
+    }
+}
+
+static void procB(void *arg) {
+    (void)arg;
+    for (;;) {
+        video_putChar('B', FOREGROUND_COLOR, BACKGROUND_COLOR);
+        cpu_pause(5000000);
+    }
 }
 
 void * initializeKernelBinary()
 {
-	char buffer[10];
+    void * moduleAddresses[] = {
+        sampleCodeModuleAddress,
+        sampleDataModuleAddress
+    };
 
-	ncPrint("[x64BareBones]");
-	ncNewline();
+    loadModules((&endOfKernelBinary), moduleAddresses);
 
-	ncPrint("CPU Vendor:");
-	ncPrint(cpuVendor(buffer));
-	ncNewline();
+    clearBSS(&bss, (uint64_t)&endOfKernel - (uint64_t)&bss);
 
-	ncPrint("[Loading modules]");
-	ncNewline();
-	void * moduleAddresses[] = {
-		sampleCodeModuleAddress,
-		sampleDataModuleAddress
-	};
-
-	loadModules(&endOfKernelBinary, moduleAddresses);
-	ncPrint("[Done]");
-	ncNewline();
-	ncNewline();
-
-	ncPrint("[Initializing kernel's binary]");
-	ncNewline();
-
-	clearBSS(&bss, &endOfKernel - &bss);
-	mm_init_default();
-	init_scheduler();
-
-	ncPrint("  text: 0x");
-	ncPrintHex((uint64_t)&text);
-	ncNewline();
-	ncPrint("  rodata: 0x");
-	ncPrintHex((uint64_t)&rodata);
-	ncNewline();
-	ncPrint("  data: 0x");
-	ncPrintHex((uint64_t)&data);
-	ncNewline();
-	ncPrint("  bss: 0x");
-	ncPrintHex((uint64_t)&bss);
-	ncNewline();
-
-	ncPrint("[Done]");
-	ncNewline();
-	ncNewline();
-	return getStackBase();
+    return getStackBase();
 }
 
 int main()
-{	
+{   
+	_cli();
+	mm_init_default();
+	init_scheduler();
+
+	scheduler_spawn_process("A", procA, NULL, NULL);
+	scheduler_spawn_process("B", procB, NULL, NULL);
+	//scheduler_spawn_process("shell", (void*)sampleCodeModuleAddress, NULL, NULL);	
+
 	load_idt();
+	_sti();
 
-	ncPrint("[Kernel Main]");
-	ncNewline();
-	ncPrint("  Sample code module at 0x");
-	ncPrintHex((uint64_t)sampleCodeModuleAddress);
-	ncNewline();
-	ncPrint("  Calling the sample code module returned: ");
-	ncPrintHex(((EntryPoint)sampleCodeModuleAddress)());
-	ncNewline();
-	ncNewline();
+	for(;;){ _hlt(); }
 
-	ncPrint("  Sample data module at 0x");
-	ncPrintHex((uint64_t)sampleDataModuleAddress);
-	ncNewline();
-	ncPrint("  Sample data module contents: ");
-	ncPrint((char*)sampleDataModuleAddress);
-	ncNewline();
-
-	ncPrint("[Creating shell process]");
-	ncNewline();
-	
-	// Crear proceso para la shell
-	process_t *shell_process = scheduler_spawn_process(
-        "shell",
-        (process_entry_point_t)sampleCodeModuleAddress,
-        NULL,
-        0,
-        PROCESS_FOREGROUND,
-        PROCESS_TYPE_USER,
-        NULL
-    );
-    
-    if (shell_process == NULL) {
-        ncPrint("ERROR: Failed to create shell process");
-        ncNewline();
-        return -1;
-    }
-    
-    ncPrint("Shell process created with PID: ");
-    ncPrintHex(shell_process->pid);
-    ncNewline();
-    ncNewline();
-
-	ncPrint("[Kernel entering idle mode]");
-	ncNewline();
-	
-	// El kernel se queda en idle
-	while(1) {
-		_hlt();
-	}
-	
-	return 0;
+    return 0;
 }

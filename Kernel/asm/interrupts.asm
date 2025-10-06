@@ -17,12 +17,17 @@ GLOBAL _exception6Handler
 GLOBAL request_snapshot
 GLOBAL _getSnapshot
 
+GLOBAL process_start
+GLOBAL setup_process_context
+
+EXTERN scheduler_finish_current
+EXTERN schedule
+
 EXTERN irqDispatcher
 EXTERN exceptionDispatcher
 EXTERN syscallDispatcher
 EXTERN getStackBase
 EXTERN timer_handler
-EXTERN schedule
 
 SECTION .text
 
@@ -311,6 +316,61 @@ haltcpu:
 
 request_snapshot:
     mov byte [do_snapshot], 1
+    ret
+
+; process_start: llama entry (en r8) con rdi=arg y luego marca terminado
+process_start:
+    and     rsp, -16
+    sub     rsp, 8   
+
+    call    r8               ; entry(arg)
+
+    add     rsp, 8
+
+    ; terminar proceso
+    call    scheduler_finish_current
+
+; setup_process_context(rdi=stack_top, rsi=entry_point, rdx=arg) -> rax=rsp_inicial
+setup_process_context:
+    push rbp
+    mov  rbp, rsp
+
+    ; Guardar args antes de tocar registros
+    ; rdi=stack_top, rsi=entry_point, rdx=arg
+    mov  r14, rdi         ; stack_top
+    mov  r13, rsi         ; entry_point
+    mov  r12, rdx         ; arg
+
+    ; Preparar RSP alineado
+    mov  rsp, r14
+    and  rsp, -16
+
+    push qword 0                    ; SS
+    push r14                        ; RSP (stack vacío del proceso)
+    push qword 0x0000000000000202   ; RFLAGS (IF=1)
+    push qword 0x0000000000000008   ; CS = 0x08 (kernel code)
+    push qword process_start        ; RIP = process_start
+
+    push qword 0          ; rax
+    push qword 0          ; rbx
+    push qword 0          ; rcx
+    push qword 0          ; rdx
+    push r14              ; rbp = stack_top
+    push r12              ; rdi = arg
+    push qword 0          ; rsi = 0
+    push r13              ; r8  = entry_point
+    push qword 0          ; r9
+    push qword 0          ; r10
+    push qword 0          ; r11
+    push qword 0          ; r12
+    push qword 0          ; r13
+    push qword 0          ; r14
+    push qword 0          ; r15
+
+    ; RAX = RSP inicial para el scheduler
+    mov  rax, rsp
+    mov  rsp, rbp
+    pop  rbp
     ret
 
 SECTION .bss

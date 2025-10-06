@@ -33,15 +33,18 @@ static uint64_t heap_free_count = 0;
 static uint64_t heap_failed_allocations = 0;
 
 static inline uint64_t align_up(uint64_t value, uint64_t alignment) {
-    return (value + alignment - 1) & ~(alignment - 1);
+    uint64_t result = (value + alignment - 1) & ~(alignment - 1);
+    return result;
 }
 
 static inline uint64_t block_size(const block_header_t *block) {
-    return block->size_and_flags & ~BLOCK_ALLOCATED_FLAG;
+    uint64_t size = block->size_and_flags & ~BLOCK_ALLOCATED_FLAG;
+    return size;
 }
 
 static inline int block_is_allocated(const block_header_t *block) {
-    return (block->size_and_flags & BLOCK_ALLOCATED_FLAG) != 0;
+    int allocated = (block->size_and_flags & BLOCK_ALLOCATED_FLAG) != 0;
+    return allocated;
 }
 
 static inline void block_mark_allocated(block_header_t *block) {
@@ -75,7 +78,8 @@ static block_header_t *find_first_fit(uint64_t required_size) {
     for (block_header_t *current = free_list_sentinel.next_free;
          current != &free_list_sentinel;
          current = current->next_free) {
-        if (block_size(current) >= required_size) {
+        uint64_t current_size = block_size(current);
+        if (current_size >= required_size) {
             return current;
         }
     }
@@ -240,13 +244,12 @@ void *mm_alloc(uint64_t size) {
     if (required_size < min_block_size) {
         required_size = min_block_size;
     }
-
+    
     block_header_t *block = find_first_fit(required_size);
     if (block == NULL) {
         heap_failed_allocations++;
         return NULL;
     }
-
     free_list_remove(block);
     block = split_block_if_possible(block, required_size);
     block_mark_allocated(block);
@@ -257,8 +260,8 @@ void *mm_alloc(uint64_t size) {
         heap_used_bytes = heap_capacity_bytes;
     }
     heap_allocation_count++;
-
-    return (uint8_t *)block + header_size;
+    void *result = (uint8_t *)block + header_size;
+    return result;
 }
 
 void mm_free(void *ptr) {
@@ -270,7 +273,6 @@ void mm_free(void *ptr) {
     if (!block_is_allocated(block)) {
         return;
     }
-
     block_mark_free(block);
     heap_free_count++;
 
@@ -319,7 +321,8 @@ void mm_get_stats(mm_stats_t *stats) {
 }
 
 uint8_t mm_is_initialized(void) {
-    return mm_initialized_flag;
+    uint8_t initialized = mm_initialized_flag;
+    return initialized;
 }
 
 #endif /* USE_SIMPLE_MM */

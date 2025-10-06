@@ -167,20 +167,15 @@ uint64_t syscall_meminfo(uint64_t user_addr, uint64_t unused1, uint64_t unused2,
 }
 
 uint64_t syscall_create_process(char *name, void *function, char *argv[]) {
-    process_t *process = process_create(
-        name != NULL ? name : "user_process",
-        (process_entry_point_t) function,
+    process_t *p = process_create(
+        name ? name : "user_process",
+        (process_entry_point_t)function,
         (void *)argv,
-        0,
-        PROCESS_FOREGROUND,
-        PROCESS_TYPE_USER,
         NULL
     );
-    if (process == NULL) {
-        return 0;
-    }
-    scheduler_add_process(process);
-    return process->pid;
+    if (!p) return 0;
+    scheduler_add_process(p);
+    return p->pid;
 }
 
 uint64_t syscall_kill(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
