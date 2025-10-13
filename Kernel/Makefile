@@ -1,6 +1,14 @@
+
 include Makefile.inc
 
+# Memory manager selection: MM=simple (default) or MM=buddy
+MM ?= simple
+
+ifeq ($(MM),buddy)
+GCCFLAGS += -DUSE_BUDDY_MM
+else
 GCCFLAGS += -DUSE_SIMPLE_MM
+endif
 
 KERNEL=kernel.bin
 SOURCES=$(wildcard *.c)
