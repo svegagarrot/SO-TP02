@@ -14,14 +14,18 @@ KERNEL=kernel.bin
 SOURCES=$(wildcard *.c)
 SOURCES_DRIVERS=$(wildcard drivers/*.c)
 SOURCES_SYS=$(wildcard sys/*.c)
-SOURCES_MM=$(wildcard mm/*.c)
 SOURCES_PROC=$(wildcard proc/*.c)
 SOURCES_UTILS=$(wildcard utils/*.c)
 SOURCES_ASM=$(wildcard asm/*.asm)
 OBJECTS=$(SOURCES:.c=.o)
 OBJECTS_DRIVERS=$(SOURCES_DRIVERS:.c=.o) 
 OBJECTS_SYS=$(SOURCES_SYS:.c=.o)
-OBJECTS_MM=$(SOURCES_MM:.c=.o)
+# Build only the selected memory manager to avoid linking both implementations
+ifeq ($(MM),buddy)
+OBJECTS_MM=mm/mm_buddy.o
+else
+OBJECTS_MM=mm/mm_simple.o
+endif
 OBJECTS_PROC=$(SOURCES_PROC:.c=.o)
 OBJECTS_UTILS=$(SOURCES_UTILS:.c=.o)
 OBJECTS_ASM=$(SOURCES_ASM:.asm=.o)

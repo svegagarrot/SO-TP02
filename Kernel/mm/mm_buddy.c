@@ -22,10 +22,10 @@ typedef struct buddy_block {
     uint8_t is_free;   // 1 = libre, 0 = tomado
 } buddy_block_t;
 
-// Tamaños derivados (HDR_SIZE debe ser múltiplo de 16)
 #define HDR_SIZE                align_up_u64(sizeof(buddy_block_t), MIN_ALIGN)
-// Bloque mínimo: header + al menos 16B de payload, 16-aligned
-#define MM_MIN_BLOCK_SIZE       (HDR_SIZE + 16ULL)
+// El tamaño de bloque base del buddy debe ser potencia de dos.
+// Calcularemos en tiempo de inicialización la potencia de dos >= (HDR_SIZE + 16).
+static uint64_t BASE_BLOCK_SIZE = 0;
 #define MM_MAX_LEVELS           32
 
 // --- Listas de libres por nivel ---
@@ -50,10 +50,10 @@ static void free_lists_init(void) {
 }
 
 static uint8_t order_for(uint64_t size_bytes) {
-    // tamaño total que necesito: payload+header, redondeado a bloque mínimo
-    uint64_t total = (size_bytes < MM_MIN_BLOCK_SIZE) ? MM_MIN_BLOCK_SIZE : size_bytes;
+    // tamaño total que necesito: payload+header, redondeado al bloque base
+    uint64_t total = (size_bytes < BASE_BLOCK_SIZE) ? BASE_BLOCK_SIZE : size_bytes;
     uint8_t order = 0;
-    uint64_t blk = MM_MIN_BLOCK_SIZE;
+    uint64_t blk = BASE_BLOCK_SIZE;
     while (blk < total && order < (MM_MAX_LEVELS - 1)) {
         blk <<= 1;
         order++;
@@ -84,10 +84,10 @@ static buddy_block_t* split_down(uint8_t from_level, uint8_t to_level) {
     for (uint8_t l = from_level; l > to_level; l--) {
         buddy_block_t *blk = pop_free(l);
         if (!blk) return NULL;
-        uint64_t size = pow2_u64(l) * MM_MIN_BLOCK_SIZE;
+        uint64_t size = pow2_u64(l) * BASE_BLOCK_SIZE;
 
         // segunda mitad: buddy
-        buddy_block_t *buddy = (buddy_block_t *)((uint8_t *)blk + (size >> 1));
+    buddy_block_t *buddy = (buddy_block_t *)((uint8_t *)blk + (size >> 1));
         buddy->level   = l - 1;
         buddy->is_free = 1;
         buddy->next = buddy->prev = NULL;
@@ -110,7 +110,7 @@ static buddy_block_t* get_block_from_ptr(void *ptr) {
 static buddy_block_t* find_buddy(buddy_block_t *blk) {
     // Calcular offset relativo, tamaño de bloque y XOR
     uint64_t offset     = (uint64_t)((uint8_t*)blk - (uint8_t*)heap_base);
-    uint64_t block_size = pow2_u64(blk->level) * MM_MIN_BLOCK_SIZE;
+    uint64_t block_size = pow2_u64(blk->level) * BASE_BLOCK_SIZE;
     uint64_t buddy_off  = offset ^ block_size;
 
     // Validación de límites con el tamaño usable real del heap
@@ -149,8 +149,9 @@ static void coalesce(buddy_block_t *blk) {
 
 // ------------------- API pública (mm.h) -------------------
 void mm_init(void *heap_start, uint64_t heap_size) {
-    // Validaciones básicas
-    if (heap_size < MM_MIN_BLOCK_SIZE) {
+    // Validaciones básicas: al menos el tamaño mínimo requerido (header + 16 bytes)
+    const uint64_t min_need_init = HDR_SIZE + 16ULL;
+    if (heap_size < min_need_init) {
         mm_initialized_flag = 0;
         heap_capacity_bytes = 0;
         heap_usable_bytes   = 0;
@@ -169,7 +170,7 @@ void mm_init(void *heap_start, uint64_t heap_size) {
 
     uint64_t usable = heap_size - alignment_loss;
     usable &= ~(MIN_ALIGN - 1ULL);
-    if (usable < MM_MIN_BLOCK_SIZE) {
+    if (usable < min_need_init) {
         mm_initialized_flag = 0;
         heap_capacity_bytes = 0;
         heap_usable_bytes   = 0;
@@ -179,9 +180,16 @@ void mm_init(void *heap_start, uint64_t heap_size) {
     heap_base         = (void*)aligned_start;
     heap_usable_bytes = usable;
 
+    // calcular BASE_BLOCK_SIZE = siguiente potencia de 2 >= (HDR_SIZE + 16)
+    uint64_t min_need = HDR_SIZE + 16ULL;
+    // next power of two
+    uint64_t v = 1;
+    while (v < min_need) v <<= 1;
+    BASE_BLOCK_SIZE = v;
+
     // Calcular nivel máximo (bloque más grande que entra)
     max_level = 0;
-    uint64_t sz = MM_MIN_BLOCK_SIZE;
+    uint64_t sz = BASE_BLOCK_SIZE;
     while (sz < usable && max_level < (MM_MAX_LEVELS - 1)) {
         sz <<= 1;
         max_level++;
@@ -190,22 +198,20 @@ void mm_init(void *heap_start, uint64_t heap_size) {
     // Inicializar free lists
     free_lists_init();
 
-    // Publicar TODA la región mediante una descomposición voraz
-    uint8_t  level     = max_level;
+    // Publicar TODA la región mediante una descomposición voraz (usar el mayor bloque posible repetidamente)
     uint64_t remaining = usable;
-    uint8_t *cur       = (uint8_t*)heap_base;
-
-    while (remaining >= MM_MIN_BLOCK_SIZE && level < MM_MAX_LEVELS) {
-        uint64_t blk_size = pow2_u64(level) * MM_MIN_BLOCK_SIZE;
-        if (blk_size > remaining) { level--; continue; }
-
+    uint8_t *cur = (uint8_t*)heap_base;
+    while (remaining >= BASE_BLOCK_SIZE) {
+        // encontrar el mayor nivel que cabe en remaining
+        int l = max_level;
+        while (l > 0 && pow2_u64(l) * BASE_BLOCK_SIZE > remaining) l--;
+        uint64_t blk_size = pow2_u64(l) * BASE_BLOCK_SIZE;
         buddy_block_t *b = (buddy_block_t*)cur;
         b->next = b->prev = NULL;
-        b->level = level;
+        b->level = (uint8_t)l;
         b->is_free = 1;
         push_free(b);
-
-        cur       += blk_size;
+        cur += blk_size;
         remaining -= blk_size;
     }
 
@@ -263,7 +269,7 @@ void* mm_alloc(uint64_t size) {
     blk->is_free = 0;
 
     // Stats (payload estimada = tamaño bloque - header)
-    uint64_t payload = pow2_u64(ord) * MM_MIN_BLOCK_SIZE - HDR_SIZE;
+    uint64_t payload = pow2_u64(ord) * BASE_BLOCK_SIZE - HDR_SIZE;
     heap_used_bytes += payload;
     if (heap_used_bytes > heap_capacity_bytes) heap_used_bytes = heap_capacity_bytes;
 
@@ -279,7 +285,7 @@ void mm_free(void *ptr) {
     blk->is_free = 1;
     heap_free_count++;
 
-    uint64_t payload = pow2_u64(blk->level) * MM_MIN_BLOCK_SIZE - HDR_SIZE;
+    uint64_t payload = pow2_u64(blk->level) * BASE_BLOCK_SIZE - HDR_SIZE;
     if (heap_used_bytes >= payload) heap_used_bytes -= payload;
     else heap_used_bytes = 0;
 
@@ -292,7 +298,7 @@ void mm_get_stats(mm_stats_t *s) {
     uint64_t largest = 0;
     for (uint8_t l = 0; l <= max_level; l++) {
         for (buddy_block_t *cur = free_lists[l]; cur; cur = cur->next) {
-            uint64_t cur_payload = pow2_u64(cur->level) * MM_MIN_BLOCK_SIZE - HDR_SIZE;
+            uint64_t cur_payload = pow2_u64(cur->level) * BASE_BLOCK_SIZE - HDR_SIZE;
             if (cur_payload > largest) largest = cur_payload;
         }
     }
@@ -308,6 +314,8 @@ void mm_get_stats(mm_stats_t *s) {
 
 uint8_t mm_is_initialized(void) { return mm_initialized_flag; }
 
-const char *mm_get_manager_name(void) { return "buddy"; }
+const char *mm_get_manager_name(void) { 
+    return "buddy"; 
+}
 
 #endif // USE_BUDDY_MM
