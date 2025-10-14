@@ -11,6 +11,7 @@
 #include "process.h"
 #include "scheduler.h"
 #include "mm.h"
+#include <string.h>
 
 #define STDIN 0
 #define STDOUT 1
@@ -193,4 +194,12 @@ uint64_t syscall_block(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_
 
 uint64_t syscall_unblock(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
     return scheduler_unblock_by_pid(pid);
+}
+
+uint64_t syscall_get_type_of_mm(uint64_t user_addr, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    if (user_addr == 0) return 0;
+    const char *name = mm_get_manager_name();
+    size_t len = strlen(name) + 1;
+    memcpy((void *)user_addr, name, len);
+    return 1;
 }

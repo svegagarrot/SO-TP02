@@ -4,6 +4,7 @@
 
 #ifdef USE_SIMPLE_MM
 
+
 #ifndef MM_DEFAULT_HEAP_LIMIT
 #define MM_DEFAULT_HEAP_LIMIT   0x20000000ULL
 #endif
@@ -323,6 +324,10 @@ void mm_get_stats(mm_stats_t *stats) {
 uint8_t mm_is_initialized(void) {
     uint8_t initialized = mm_initialized_flag;
     return initialized;
+}
+
+const char *mm_get_manager_name(void) { 
+    return "simple"; 
 }
 
 #endif /* USE_SIMPLE_MM */

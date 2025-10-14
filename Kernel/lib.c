@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stddef.h>
 
 void * memset(void * destination, int32_t c, uint64_t length)
 {
@@ -35,4 +36,13 @@ void * memcpy(void * destination, const void * source, uint64_t length)
 	}
 
 	return destination;
+}
+
+size_t strlen(const char *s) {
+	size_t len = 0;
+	if (!s) return 0;
+	while (s[len] != '\0') {
+		len++;
+	}
+	return len;
 }

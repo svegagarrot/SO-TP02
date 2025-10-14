@@ -72,5 +72,6 @@ int64_t my_create_process(char *name, void *function, char *argv[]);
 int64_t my_kill(uint64_t pid);
 int64_t my_block(uint64_t pid);
 int64_t my_unblock(uint64_t pid);
+int get_type_of_mm(char *buf, int buflen);
 
 #endif

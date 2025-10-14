@@ -26,4 +26,5 @@ uint64_t sys_create_process(char *name, void *function, char *argv[]);
 uint64_t sys_kill(uint64_t pid);
 uint64_t sys_block(uint64_t pid);
 uint64_t sys_unblock(uint64_t pid);
+uint64_t sys_get_type_of_mm(char *user_buf, int buflen);
 #endif

@@ -20,5 +20,6 @@ void *mm_alloc(uint64_t size);
 void mm_free(void *ptr);
 void mm_get_stats(mm_stats_t *stats);
 uint8_t mm_is_initialized(void);
+const char *mm_get_manager_name(void);
 
 #endif

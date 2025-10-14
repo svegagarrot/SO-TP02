@@ -22,6 +22,7 @@ GLOBAL sys_create_process
 GLOBAL sys_kill
 GLOBAL sys_block
 GLOBAL sys_unblock
+GLOBAL sys_get_type_of_mm
 
 
 sys_read:
@@ -217,6 +218,15 @@ sys_unblock:
     push rbp
     mov rbp, rsp
     mov rax, 21
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_get_type_of_mm:
+    push rbp
+    mov rbp, rsp
+    mov rax, 22
     int 0x80
     mov rsp, rbp
     pop rbp

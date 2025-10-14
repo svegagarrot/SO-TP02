@@ -74,6 +74,8 @@ int strcmp(const char *s1, const char *s2) {
 }
 
 
+
+
 int atoi(const char *str) {
 
     int res = 0;
@@ -498,16 +500,22 @@ int64_t my_create_process(char *name, void *function, char *argv[]) {
     }
     
     return sys_create_process(name, function, argv);
-  }
+}
 
 int64_t my_kill(uint64_t pid) {
     return sys_kill(pid);
-  }
+}
   
-  int64_t my_block(uint64_t pid) {
+int64_t my_block(uint64_t pid) {
     return sys_block(pid);
-  }
+}
   
   int64_t my_unblock(uint64_t pid) {
     return sys_unblock(pid);
-  }
+}
+
+int get_type_of_mm(char *buf, int buflen) {
+    if (!buf || buflen <= 0) return 0;
+    // call asm stub
+    return (int)sys_get_type_of_mm(buf, buflen);
+}

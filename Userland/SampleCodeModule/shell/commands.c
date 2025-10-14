@@ -7,6 +7,7 @@
 extern void _invalidOp();
 extern int64_t test_mm(uint64_t argc, char *argv[]);
 extern int64_t test_processes(uint64_t argc, char *argv[]);
+extern int mmTypeCmd(int argc, char *argv[]);
 
 const TShellCmd shellCmds[] = {
     {"help", helpCmd, ": Muestra los comandos disponibles\n"},
@@ -20,8 +21,10 @@ const TShellCmd shellCmds[] = {
     {"exceptions", exceptionCmd, ": Testear excepciones. Ingrese: exceptions [zero/invalidOpcode] para testear alguna operacion\n"},
     {"jugar", gameCmd, ": Inicia el modo juego\n"},
     {"regs", regsCmd, ": Muestra los ultimos 18 registros de la CPU\n"},
+    {"mmtype", mmTypeCmd, ": Muestra el tipo de memory manager activo\n"},
     {NULL, NULL, NULL}, 
 };
+
 
 int regsCmd(int argc, char *argv[]) {
     uint64_t snap[18];
@@ -194,5 +197,15 @@ int testProcesesCmd(int argc, char *argv[]) {
 
 int gameCmd(int argc, char *argv[]) {
     game_main_screen();
+    return OK;
+}
+
+int mmTypeCmd(int argc, char *argv[]) {
+    char buf[32] = {0};
+    if (get_type_of_mm(buf, sizeof(buf))) {
+        printf("Memory manager activo: %s\n", buf);
+    } else {
+        printf("No se pudo obtener el tipo de memory manager\n");
+    }
     return OK;
 }
