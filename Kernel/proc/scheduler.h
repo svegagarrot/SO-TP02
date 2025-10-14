@@ -17,6 +17,7 @@ process_t *scheduler_spawn_process(const char *name,
 void scheduler_block_current(void);
 void scheduler_unblock_process(process_t *p);
 void scheduler_finish_current(void);
+process_t *scheduler_collect_finished(void);
 int scheduler_kill_by_pid(uint64_t pid);
 int scheduler_unblock_by_pid(uint64_t pid);
 

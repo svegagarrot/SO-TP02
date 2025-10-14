@@ -13,6 +13,9 @@ static process_t *current = NULL;
 static process_t *idle_p  = NULL;
 static uint64_t    last_switch_tick = 0;
 
+static inline void sched_crit_enter(void) { _cli(); }
+static inline void sched_crit_exit(void)  { _sti(); }
+
 static void idle_entry(void *unused) {
     (void)unused;
     for (;;) { _hlt(); }
@@ -26,12 +29,18 @@ static void save_context(process_t *p, uint64_t current_rsp) {
 
     p->rsp = current_rsp;
 
-    p->rbp = ((uint64_t *)current_rsp)[4];
+    // La pila en schedule() apunta al tope del pushState del handler:
+    // [0]=r15, [1]=r14, [2]=r13, [3]=r12, [4]=r11, [5]=r10, [6]=r9, [7]=r8,
+    // [8]=rsi, [9]=rdi, [10]=rbp, [11]=rdx, [12]=rcx, [13]=rbx, [14]=rax
+    // Por lo tanto, para guardar el RBP correcto del proceso debemos leer índice 10.
+    p->rbp = ((uint64_t *)current_rsp)[10];
     
     switch (p->state) {
         case PROCESS_STATE_RUNNING:
             if (p != idle_p) {
                 p->state = PROCESS_STATE_READY; 
+                // En IRQ context IF ya está deshabilitado, pero mantener la
+                // convención de secciones críticas si se reutiliza.
                 process_queue_push(&ready_q, p);
             } 
             break;
@@ -87,6 +96,12 @@ uint64_t schedule(uint64_t current_rsp) {
     next->state = PROCESS_STATE_RUNNING;
     current = next;
     last_switch_tick = now;
+
+    // Recolectar y liberar procesos terminados para evitar fuga de memoria
+    // que puede trabar el sistema después de muchos pids.
+    for (process_t *fp = scheduler_collect_finished(); fp != NULL; fp = scheduler_collect_finished()) {
+        process_destroy(fp);
+    }
     return next->rsp;
 }
 
@@ -98,8 +113,10 @@ void scheduler_add_process(process_t *p) {
     if (!p || p == idle_p) {
         return;
     }
+    sched_crit_enter();
     p->state = PROCESS_STATE_READY;
     process_queue_push(&ready_q, p);
+    sched_crit_exit();
 }
 
 process_t *scheduler_spawn_process(const char *name,
@@ -118,6 +135,7 @@ void scheduler_block_current(void) {
     if (!current || current == idle_p) {
         return;
     }
+    // Se marca bloqueado; el movimiento a cola sucede en save_context.
     current->state = PROCESS_STATE_BLOCKED;
 }
 
@@ -125,20 +143,25 @@ void scheduler_unblock_process(process_t *p) {
     if (!p) {
         return;
     }
+    sched_crit_enter();
     process_queue_remove(&blocked_q, p);
     p->state = PROCESS_STATE_READY;
     process_queue_push(&ready_q, p);
+    sched_crit_exit();
 }
 
 void scheduler_finish_current(void) {
     if (!current || current == idle_p) {
         return;
     }
+    // Se marca terminado; movimiento a cola en save_context.
     current->state = PROCESS_STATE_FINISHED;
 }
 
 process_t *scheduler_collect_finished(void) {
+    sched_crit_enter();
     process_t *p = process_queue_pop(&finished_q);
+    sched_crit_exit();
     return p;
 }
 
@@ -183,9 +206,11 @@ int scheduler_kill_by_pid(uint64_t pid) {
         return 0;
     }
     // marcar terminado y mover a finished
+    sched_crit_enter();
     p->state = PROCESS_STATE_FINISHED;
     process_queue_remove(&ready_q, p);
     process_queue_remove(&blocked_q, p);
     process_queue_push(&finished_q, p);
+    sched_crit_exit();
     return 1;
 }

@@ -330,6 +330,13 @@ process_start:
     ; terminar proceso
     call    scheduler_finish_current
 
+    ; No continuar ejecutando código de abajo (setup_process_context).
+    ; Mantener CPU esperando próximo tick para que el scheduler saque este proceso.
+.finished_loop:
+    sti
+    hlt
+    jmp     .finished_loop
+
 ; setup_process_context(rdi=stack_top, rsi=entry_point, rdx=arg) -> rax=rsp_inicial
 setup_process_context:
     push rbp

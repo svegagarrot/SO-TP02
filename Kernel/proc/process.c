@@ -94,17 +94,31 @@ void process_queue_init(process_queue_t *q) {
 
 static void detach_from_queue(process_queue_t *q, process_t *p) {
     if (!q || !p) return;
-    int linked = (p->queue_next != NULL) || (p->queue_prev != NULL) || (q->head == p);
-    if (!linked) return;
 
-    if (p->queue_prev) p->queue_prev->queue_next = p->queue_next;
-    else               q->head = p->queue_next;
+    // Verificar pertenencia: recorrer la cola y confirmar que 'p' está en 'q'.
+    process_t *it = q->head;
+    int found = 0;
+    while (it) {
+        if (it == p) { found = 1; break; }
+        it = it->queue_next;
+    }
+    if (!found) return; // 'p' no pertenece a esta cola; no hacer nada.
 
-    if (p->queue_next) p->queue_next->queue_prev = p->queue_prev;
-    else               q->tail = p->queue_prev;
+    if (p->queue_prev) {
+        p->queue_prev->queue_next = p->queue_next;
+    } else {
+        q->head = p->queue_next;
+    }
+
+    if (p->queue_next) {
+        p->queue_next->queue_prev = p->queue_prev;
+    } else {
+        q->tail = p->queue_prev;
+    }
 
     if (q->size) q->size--;
-    p->queue_next = p->queue_prev = NULL;
+    p->queue_next = NULL;
+    p->queue_prev = NULL;
 }
 
 void process_queue_remove(process_queue_t *q, process_t *p) { detach_from_queue(q, p); }
