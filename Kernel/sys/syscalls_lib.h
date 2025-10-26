@@ -30,6 +30,7 @@ uint64_t syscall_block(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_
 uint64_t syscall_unblock(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4);
 uint64_t syscall_get_type_of_mm(uint64_t user_addr, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4);
 
+// Nuevas syscalls de procesos para test_prio
 uint64_t syscall_getpid(uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4, uint64_t unused5);
 uint64_t syscall_set_priority(uint64_t pid, uint64_t new_priority, uint64_t unused2, uint64_t unused3, uint64_t unused4);
 uint64_t syscall_wait(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4);
