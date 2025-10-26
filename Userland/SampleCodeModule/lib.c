@@ -494,11 +494,29 @@ int memory_info(memory_info_t *info) {
     return (int)sys_meminfo(info);
 }
 
+// Resolver de nombre -> puntero a función para tests que pasan function=NULL
+static void *resolve_function_by_name(const char *name) {
+    if (name == NULL) return NULL;
+    // Declaraciones adelantadas de funciones de tests
+    // test_prio.c
+    void zero_to_max(void);
+    // test_util.c
+    void endless_loop(void);
+    void endless_loop_print(uint64_t wait);
+
+    if (strcmp(name, "zero_to_max") == 0) return (void *)zero_to_max;
+    if (strcmp(name, "endless_loop") == 0) return (void *)endless_loop;
+    if (strcmp(name, "endless_loop_print") == 0) return (void *)endless_loop_print;
+    return NULL;
+}
+
 int64_t my_create_process(char *name, void *function, char *argv[]) {
     if (function == NULL) {
-        return -1; // Función inválida
+        function = resolve_function_by_name(name);
+        if (function == NULL) {
+            return -1; // No se pudo resolver
+        }
     }
-    
     return sys_create_process(name, function, argv);
 }
 

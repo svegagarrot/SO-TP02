@@ -27,4 +27,7 @@ uint64_t sys_kill(uint64_t pid);
 uint64_t sys_block(uint64_t pid);
 uint64_t sys_unblock(uint64_t pid);
 uint64_t sys_get_type_of_mm(char *user_buf, int buflen);
+uint64_t sys_getpid();
+uint64_t sys_set_priority(uint64_t pid, uint64_t new_priority);
+uint64_t sys_wait(uint64_t pid);
 #endif

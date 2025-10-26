@@ -23,6 +23,9 @@ GLOBAL sys_kill
 GLOBAL sys_block
 GLOBAL sys_unblock
 GLOBAL sys_get_type_of_mm
+GLOBAL sys_getpid
+GLOBAL sys_set_priority
+GLOBAL sys_wait
 
 
 sys_read:
@@ -227,6 +230,33 @@ sys_get_type_of_mm:
     push rbp
     mov rbp, rsp
     mov rax, 22
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_getpid:
+    push rbp
+    mov rbp, rsp
+    mov rax, 23
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_set_priority:
+    push rbp
+    mov rbp, rsp
+    mov rax, 24
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_wait:
+    push rbp
+    mov rbp, rsp
+    mov rax, 25
     int 0x80
     mov rsp, rbp
     pop rbp

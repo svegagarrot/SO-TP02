@@ -8,6 +8,10 @@
 #define PROCESS_KERNEL_STACK_SIZE (4 * 4096)
 #define PROCESS_USER_STACK_SIZE   (4 * 4096)
 
+#define PROCESS_PRIORITY_MIN      0
+#define PROCESS_PRIORITY_MAX      2
+#define PROCESS_PRIORITY_DEFAULT  1
+
 typedef struct process_control_block process_t;
 typedef void (*process_entry_point_t)(void *);
 
@@ -24,6 +28,7 @@ struct process_control_block {
     char     name[PROCESS_NAME_MAX_LEN + 1];
 
     process_state_t state;
+    int             priority;
 
     uint64_t rsp;
     uint64_t rbp;
@@ -35,6 +40,7 @@ struct process_control_block {
 
     process_entry_point_t entry_point;
     void *entry_arg;
+    uint64_t waiting_on_pid;
 
     process_t *parent;
     process_t *first_child;
@@ -43,6 +49,8 @@ struct process_control_block {
 
     process_t *queue_next;
     process_t *queue_prev;
+    process_t *waiters_head;
+    process_t *waiter_next;
 };
 
 void process_system_init(void);

@@ -7,6 +7,7 @@
 extern void _invalidOp();
 extern int64_t test_mm(uint64_t argc, char *argv[]);
 extern int64_t test_processes(uint64_t argc, char *argv[]);
+extern uint64_t test_prio(uint64_t argc, char *argv[]);
 extern int mmTypeCmd(int argc, char *argv[]);
 
 const TShellCmd shellCmds[] = {
@@ -18,6 +19,7 @@ const TShellCmd shellCmds[] = {
     {"font-size", fontSizeCmd, ": Cambia el tamanio de la fuente\n"},
     {"testmm", testMMCmd, ": Ejecuta el stress test de memoria. Uso: testmm <max_mem>\n"},
     {"testproceses", testProcesesCmd, ": Ejecuta el stress test de procesos. Uso: testproceses <max_proceses>\n"},
+    {"test_priority", testPriorityCmd, ": Ejecuta el test de prioridades. Uso: test_priority <max_value>\n"},
     {"exceptions", exceptionCmd, ": Testear excepciones. Ingrese: exceptions [zero/invalidOpcode] para testear alguna operacion\n"},
     {"jugar", gameCmd, ": Inicia el modo juego\n"},
     {"regs", regsCmd, ": Muestra los ultimos 18 registros de la CPU\n"},
@@ -206,6 +208,19 @@ int mmTypeCmd(int argc, char *argv[]) {
         printf("Memory manager activo: %s\n", buf);
     } else {
         printf("No se pudo obtener el tipo de memory manager\n");
+    }
+    return OK;
+}
+
+int testPriorityCmd(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Uso: test_priority <max_value>\n");
+        return CMD_ERROR;
+    }
+    uint64_t res = test_prio(argc - 1, argv + 1);
+    if ((int64_t)res == -1) {
+        printf("test_priority fallo\n");
+        return CMD_ERROR;
     }
     return OK;
 }

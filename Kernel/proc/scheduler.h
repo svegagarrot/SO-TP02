@@ -20,5 +20,9 @@ void scheduler_finish_current(void);
 process_t *scheduler_collect_finished(void);
 int scheduler_kill_by_pid(uint64_t pid);
 int scheduler_unblock_by_pid(uint64_t pid);
+int scheduler_block_by_pid(uint64_t pid);
+
+process_t *scheduler_find_by_pid(uint64_t pid);
+int scheduler_set_priority(uint64_t pid, uint8_t new_priority);
 
 #endif

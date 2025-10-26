@@ -1,12 +1,13 @@
 #include <stdint.h>
+#include "../include/syscall.h"
 
 int64_t my_getpid() {
-  return 0;
+  return (int64_t)sys_getpid();
 }
 
 
 int64_t my_nice(uint64_t pid, uint64_t newPrio) {
-  return 0;
+  return (int64_t)sys_set_priority(pid, newPrio);
 }
 
 
@@ -31,5 +32,5 @@ int64_t my_yield() {
 }
 
 int64_t my_wait(int64_t pid) {
-  return 0;
+  return (int64_t)sys_wait((uint64_t)pid);
 }

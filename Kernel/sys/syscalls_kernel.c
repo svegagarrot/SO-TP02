@@ -184,12 +184,7 @@ uint64_t syscall_kill(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t
 }
 
 uint64_t syscall_block(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
-    process_t *current = scheduler_current_process();
-    if (current == NULL || current->pid != pid) {
-        return 0;
-    }
-    scheduler_block_current();
-    return 1;
+    return scheduler_block_by_pid(pid);
 }
 
 uint64_t syscall_unblock(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
@@ -201,5 +196,32 @@ uint64_t syscall_get_type_of_mm(uint64_t user_addr, uint64_t unused1, uint64_t u
     const char *name = mm_get_manager_name();
     size_t len = strlen(name) + 1;
     memcpy((void *)user_addr, name, len);
+    return 1;
+}
+
+uint64_t syscall_getpid(uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4, uint64_t unused5) {
+    process_t *p = scheduler_current_process();
+    return p ? p->pid : 0;
+}
+
+uint64_t syscall_set_priority(uint64_t pid, uint64_t newPrio, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    return (uint64_t)scheduler_set_priority(pid, (uint8_t)newPrio);
+}
+
+uint64_t syscall_wait(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    if ((int64_t)pid <= 0) return 0;
+    process_t *target = scheduler_find_by_pid(pid);
+    if (!target) return 0;
+
+    if (target->state == PROCESS_STATE_FINISHED) {
+        return 1;
+    }
+
+    process_t *me = scheduler_current_process();
+    if (!me || me == target || me == NULL) return 0;
+    me->waiting_on_pid = pid;
+    me->waiter_next = target->waiters_head;
+    target->waiters_head = me;
+    scheduler_block_current();
     return 1;
 }
