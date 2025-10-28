@@ -43,6 +43,8 @@ int printf(const char *fmt, ...);
 size_t strlen(const char *s);
 char *strncpy(char *dest, const char *src, size_t n);
 int strcmp(const char *s1, const char *s2);
+void *memset(void *s, int c, size_t n);
+void *memcpy(void *dest, const void *src, size_t n);
 int atoi(const char *str);
 char *fgets(char *s, int n, FILE *stream);
 void clearScreen();
@@ -72,6 +74,14 @@ int64_t my_create_process(char *name, void *function, char *argv[]);
 int64_t my_kill(uint64_t pid);
 int64_t my_block(uint64_t pid);
 int64_t my_unblock(uint64_t pid);
+int64_t my_getpid();
+int64_t my_nice(uint64_t pid, uint64_t newPrio);
+int64_t my_wait(int64_t pid);
+int64_t my_sem_open(char *sem_id, uint64_t initialValue);
+int64_t my_sem_wait(char *sem_id);
+int64_t my_sem_post(char *sem_id);
+int64_t my_sem_close(char *sem_id);
+int64_t my_yield();
 int get_type_of_mm(char *buf, int buflen);
 
 #endif

@@ -1,6 +1,5 @@
 #include <stdint.h>
-#include <stdio.h>
-#include "syscall.h"
+#include "lib.h"
 
 // Random
 static uint32_t m_z = 362436069;

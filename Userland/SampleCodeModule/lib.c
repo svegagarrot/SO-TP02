@@ -73,6 +73,15 @@ int strcmp(const char *s1, const char *s2) {
     return *(unsigned char *)s1 - *(unsigned char *)s2;
 }
 
+void *memcpy(void *dest, const void *src, size_t n) {
+    unsigned char *d = (unsigned char *)dest;
+    const unsigned char *s = (const unsigned char *)src;
+    for (size_t i = 0; i < n; i++) {
+        d[i] = s[i];
+    }
+    return dest;
+}
+
 
 
 
@@ -536,4 +545,36 @@ int get_type_of_mm(char *buf, int buflen) {
     if (!buf || buflen <= 0) return 0;
     // call asm stub
     return (int)sys_get_type_of_mm(buf, buflen);
+}
+
+int64_t my_getpid() {
+    return (int64_t)sys_getpid();
+}
+
+int64_t my_nice(uint64_t pid, uint64_t newPrio) {
+    return (int64_t)sys_set_priority(pid, newPrio);
+}
+
+int64_t my_sem_open(char *sem_id, uint64_t initialValue) {
+    return 0;
+}
+
+int64_t my_sem_wait(char *sem_id) {
+    return 0;
+}
+
+int64_t my_sem_post(char *sem_id) {
+    return 0;
+}
+
+int64_t my_sem_close(char *sem_id) {
+    return 0;
+}
+
+int64_t my_yield() {
+    return 0;
+}
+
+int64_t my_wait(int64_t pid) {
+    return (int64_t)sys_wait((uint64_t)pid);
 }

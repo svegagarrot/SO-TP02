@@ -1,6 +1,5 @@
 #include <stdint.h>
-#include <stdio.h>
-#include "syscall.h"
+#include "lib.h"
 #include "test_util.h"
 
 #define TOTAL_PROCESSES 3
@@ -71,4 +70,6 @@ uint64_t test_prio(uint64_t argc, char *argv[]) {
 
   for (i = 0; i < TOTAL_PROCESSES; i++)
     my_wait(pids[i]);
-}
+
+  return 0;
+  }
