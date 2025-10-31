@@ -32,6 +32,7 @@ const TShellCmd shellCmds[] = {
     {"kill", killCmd, ": Mata un proceso por PID. Uso: kill <pid>\n"},
     {"nice", niceCmd, ": Cambia la prioridad de un proceso. Uso: nice <pid> <prioridad>\n"},
     {"block", blockCmd, ": Cambia el estado de un proceso entre bloqueado y listo. Uso: block <pid>\n"},
+    {"mem", memCmd, ": Imprime el estado de la memoria\n"},
     {NULL, NULL, NULL}, 
 };
 
@@ -485,5 +486,36 @@ int blockCmd(int argc, char *argv[]) {
         printf("Proceso %lld bloqueado exitosamente.\n", pid);
     }
 
+    return OK;
+}
+
+int memCmd(int argc, char *argv[]) {
+    (void)argc;  // No se usan argumentos
+    (void)argv;
+
+    memory_info_t info;
+    if (memory_info(&info) == 0) {
+        printf("Error: no se pudo obtener la informacion de memoria.\n");
+        return CMD_ERROR;
+    }
+
+    printf("\n=== Estado de la Memoria ===\n");
+    printf("Total de bytes:       %llu\n", info.total_bytes);
+    printf("Bytes usados:         %llu\n", info.used_bytes);
+    printf("Bytes libres:         %llu\n", info.free_bytes);
+    printf("Bloque libre mas grande: %llu bytes\n", info.largest_free_block);
+    printf("Asignaciones totales: %llu\n", info.allocations);
+    printf("Liberaciones totales: %llu\n", info.frees);
+    printf("Asignaciones fallidas: %llu\n", info.failed_allocations);
+    
+    // Calcular porcentaje de uso
+    if (info.total_bytes > 0) {
+        uint64_t used_percent = (info.used_bytes * 100) / info.total_bytes;
+        uint64_t free_percent = (info.free_bytes * 100) / info.total_bytes;
+        printf("\nPorcentaje de uso:   %llu%%\n", used_percent);
+        printf("Porcentaje libre:    %llu%%\n", free_percent);
+    }
+    
+    printf("\n");
     return OK;
 }

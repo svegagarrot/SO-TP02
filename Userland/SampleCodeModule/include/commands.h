@@ -39,4 +39,5 @@ int loopCmd(int argc, char *argv[]);
 int killCmd(int argc, char *argv[]);
 int niceCmd(int argc, char *argv[]);
 int blockCmd(int argc, char *argv[]);
+int memCmd(int argc, char *argv[]);
 #endif
