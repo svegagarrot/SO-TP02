@@ -25,4 +25,7 @@ int scheduler_block_by_pid(uint64_t pid);
 process_t *scheduler_find_by_pid(uint64_t pid);
 int scheduler_set_priority(uint64_t pid, uint8_t new_priority);
 
+// Función para listar todos los procesos del sistema
+uint64_t scheduler_list_all_processes(process_info_t *buffer, uint64_t max_count);
+
 #endif

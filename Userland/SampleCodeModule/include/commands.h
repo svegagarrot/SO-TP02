@@ -34,4 +34,9 @@ int exceptionCmd(int argc, char *argv[]);
 int gameCmd(int argc, char *argv[]);
 int regsCmd(int argc, char *argv[]);
 int set_some_regs();
+int psCmd(int argc, char *argv[]);
+int loopCmd(int argc, char *argv[]);
+int killCmd(int argc, char *argv[]);
+int niceCmd(int argc, char *argv[]);
+int blockCmd(int argc, char *argv[]);
 #endif

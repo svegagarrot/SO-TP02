@@ -81,4 +81,16 @@ void process_queue_push(process_queue_t *q, process_t *p);
 process_t * process_queue_pop(process_queue_t *q);
 int process_queue_is_empty(const process_queue_t *q);
 
+// Estructura para pasar información de procesos a userland
+#define MAX_PROCESS_INFO 64
+typedef struct {
+    uint64_t pid;
+    char name[PROCESS_NAME_MAX_LEN + 1];
+    process_state_t state;
+    int priority;
+    uint64_t rsp;
+    uint64_t rbp;
+    int foreground;  // 1 si está corriendo (RUNNING), 0 caso contrario
+} process_info_t;
+
 #endif

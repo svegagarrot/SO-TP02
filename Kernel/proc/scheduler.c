@@ -350,3 +350,70 @@ int scheduler_block_by_pid(uint64_t pid) {
     sched_crit_exit();
     return 1;
 }
+
+static void add_process_to_list(process_t *p, process_info_t *buffer, uint64_t *count, uint64_t max_count) {
+    if (!p || !buffer || *count >= max_count || p == idle_p) {
+        return;
+    }
+
+    buffer[*count].pid = p->pid;
+    for (int i = 0; i < PROCESS_NAME_MAX_LEN && p->name[i] != '\0'; i++) {
+        buffer[*count].name[i] = p->name[i];
+    }
+    buffer[*count].name[PROCESS_NAME_MAX_LEN] = '\0';
+    buffer[*count].state = p->state;
+    buffer[*count].priority = p->priority;
+    buffer[*count].rsp = p->rsp;
+    buffer[*count].rbp = p->rbp;
+    buffer[*count].foreground = (p->state == PROCESS_STATE_RUNNING) ? 1 : 0;
+    (*count)++;
+}
+
+uint64_t scheduler_list_all_processes(process_info_t *buffer, uint64_t max_count) {
+    if (!buffer || max_count == 0) {
+        return 0;
+    }
+
+    sched_crit_enter();
+    uint64_t count = 0;
+
+    // Agregar procesos de las colas ready por prioridad
+    for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
+        for (process_t *p = ready_queues[pr].head; p && count < max_count; p = p->queue_next) {
+            add_process_to_list(p, buffer, &count, max_count);
+        }
+    }
+
+    // Agregar procesos bloqueados
+    for (process_t *p = blocked_q.head; p && count < max_count; p = p->queue_next) {
+        add_process_to_list(p, buffer, &count, max_count);
+    }
+
+    // Agregar procesos terminados
+    for (process_t *p = finished_q.head; p && count < max_count; p = p->queue_next) {
+        add_process_to_list(p, buffer, &count, max_count);
+    }
+
+    // Agregar proceso actual (si no está ya en alguna cola)
+    if (current && count < max_count) {
+        // Verificar si current ya fue agregado
+        int already_added = 0;
+        for (uint64_t i = 0; i < count; i++) {
+            if (buffer[i].pid == current->pid) {
+                already_added = 1;
+                // Actualizar la información del proceso current para asegurar que tiene foreground=1
+                buffer[i].state = current->state;
+                buffer[i].rsp = current->rsp;
+                buffer[i].rbp = current->rbp;
+                buffer[i].foreground = (current->state == PROCESS_STATE_RUNNING) ? 1 : 0;
+                break;
+            }
+        }
+        if (!already_added) {
+            add_process_to_list(current, buffer, &count, max_count);
+        }
+    }
+
+    sched_crit_exit();
+    return count;
+}

@@ -258,3 +258,11 @@ uint64_t syscall_sem_get(uint64_t sem_id) {
     if (!sem_get_value_by_id(sem_id, &val)) return (uint64_t)-1;
     return (uint64_t)val;
 }
+
+uint64_t syscall_list_processes(uint64_t user_addr, uint64_t max_count, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    if (user_addr == 0 || max_count == 0 || max_count > MAX_PROCESS_INFO) {
+        return 0;
+    }
+    uint64_t count = scheduler_list_all_processes((process_info_t *)user_addr, max_count);
+    return count;
+}

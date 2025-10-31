@@ -295,21 +295,84 @@ int printf(const char *fmt, ...) {
                     break;
                 }
                 case 'l':
-                    if (fmt[i+1]=='l' && fmt[i+2]=='x') {
-                        unsigned long long v = va_arg(args, unsigned long long);
-                        char buf[17];
-                        buf[16] = '\0';
-                        for (int j = 15; j >= 0; j--) {
-                            buf[j] = "0123456789ABCDEF"[v & 0xF];
-                            v >>= 4;
+                    if (fmt[i+1]=='l') {
+                        if (fmt[i+2]=='x') {
+                            // %llx - hexadecimal
+                            unsigned long long v = va_arg(args, unsigned long long);
+                            char buf[17];
+                            buf[16] = '\0';
+                            for (int j = 15; j >= 0; j--) {
+                                buf[j] = "0123456789ABCDEF"[v & 0xF];
+                                v >>= 4;
+                            }
+                            char *p = buf;
+                            while (*p=='0' && *(p+1)) p++;
+                            printf("%s", p);
+                            count += strlen(p);
+                            i += 2;  
+                            break;
+                        } else if (fmt[i+2]=='d') {
+                            // %lld - long long decimal con signo
+                            long long v = va_arg(args, long long);
+                            int64_t val = (int64_t)v;
+                            if (val == 0) {
+                                putchar('0');
+                                count++;
+                            } else {
+                                char buf[21];
+                                int buf_i = 0;
+                                uint64_t uval;
+                                
+                                if (val < 0) {
+                                    putchar('-');
+                                    count++;
+                                    // Evitar overflow en INT64_MIN: usar conversión directa
+                                    // Si val == INT64_MIN, -val causaría overflow
+                                    if (val == -9223372036854775807LL - 1LL) {
+                                        uval = 9223372036854775808ULL;
+                                    } else {
+                                        uval = (uint64_t)(-val);
+                                    }
+                                } else {
+                                    uval = (uint64_t)val;
+                                }
+                                
+                                while (uval > 0) {
+                                    buf[buf_i++] = (uval % 10) + '0';
+                                    uval /= 10;
+                                }
+                                while (buf_i--) {
+                                    putchar(buf[buf_i]);
+                                    count++;
+                                }
+                            }
+                            i += 2;
+                            break;
+                        } else if (fmt[i+2]=='u') {
+                            // %llu - long long decimal sin signo
+                            unsigned long long v = va_arg(args, unsigned long long);
+                            uint64_t val = (uint64_t)v;
+                            if (val == 0) {
+                                putchar('0');
+                                count++;
+                            } else {
+                                char buf[21];
+                                int buf_i = 0;
+                                while (val > 0) {
+                                    buf[buf_i++] = (val % 10) + '0';
+                                    val /= 10;
+                                }
+                                while (buf_i--) {
+                                    putchar(buf[buf_i]);
+                                    count++;
+                                }
+                            }
+                            i += 2;
+                            break;
                         }
-                        char *p = buf;
-                        while (*p=='0' && *(p+1)) p++;
-                        printf("%s", p);
-                        count += strlen(p);
-                        i += 2;  
-                        break;
                     }
+                    // Si es solo 'l' sin 'l' adicional, tratarlo como caso default
+                    // fallthrough
                 default:
                     putchar('%');
                     putchar(fmt[i]);
@@ -512,10 +575,13 @@ static void *resolve_function_by_name(const char *name) {
     // test_util.c
     void endless_loop(void);
     void endless_loop_print(uint64_t wait);
+    // test_sync.c
+    uint64_t my_process_inc(uint64_t argc, char *argv[]);
 
     if (strcmp(name, "zero_to_max") == 0) return (void *)zero_to_max;
     if (strcmp(name, "endless_loop") == 0) return (void *)endless_loop;
     if (strcmp(name, "endless_loop_print") == 0) return (void *)endless_loop_print;
+    if (strcmp(name, "my_process_inc") == 0) return (void *)my_process_inc;
     return NULL;
 }
 
@@ -636,4 +702,11 @@ int64_t my_yield() {
 
 int64_t my_wait(int64_t pid) {
     return (int64_t)sys_wait((uint64_t)pid);
+}
+
+uint64_t list_processes(process_info_t *buffer, uint64_t max_count) {
+    if (!buffer || max_count == 0) {
+        return 0;
+    }
+    return sys_list_processes(buffer, max_count);
 }

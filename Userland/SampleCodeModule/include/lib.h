@@ -33,6 +33,25 @@ typedef struct {
     uint64_t failed_allocations;
 } memory_info_t;
 
+// Estados de proceso
+#define PROCESS_STATE_NEW 0
+#define PROCESS_STATE_READY 1
+#define PROCESS_STATE_RUNNING 2
+#define PROCESS_STATE_BLOCKED 3
+#define PROCESS_STATE_FINISHED 4
+
+#define PROCESS_NAME_MAX_LEN 32
+#define MAX_PROCESS_INFO 64
+
+typedef struct {
+    uint64_t pid;
+    char name[PROCESS_NAME_MAX_LEN + 1];
+    int state;
+    int priority;
+    uint64_t rsp;
+    uint64_t rbp;
+    int foreground;
+} process_info_t;
 
 extern int current_font_scale;
 
@@ -83,5 +102,6 @@ int64_t my_sem_post(char *sem_id);
 int64_t my_sem_close(char *sem_id);
 int64_t my_yield();
 int get_type_of_mm(char *buf, int buflen);
+uint64_t list_processes(process_info_t *buffer, uint64_t max_count);
 
 #endif
