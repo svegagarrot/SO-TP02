@@ -12,6 +12,7 @@
 #include "scheduler.h"
 #include "mm.h"
 #include <string.h>
+#include "semaphore.h"
 
 #define STDIN 0
 #define STDOUT 1
@@ -224,4 +225,36 @@ uint64_t syscall_wait(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t
     target->waiters_head = me;
     scheduler_block_current();
     return 1;
+}
+
+uint64_t syscall_sem_create(int initial) {
+    if (initial < 0) return 0;
+    uint64_t id = sem_alloc(initial);
+    return id;
+}
+
+uint64_t syscall_sem_open(uint64_t sem_id) {
+    return sem_open_by_id(sem_id);
+}
+
+uint64_t syscall_sem_close(uint64_t sem_id) {
+    return sem_close_by_id(sem_id);
+}
+
+uint64_t syscall_sem_wait(uint64_t sem_id) {
+    return sem_wait_by_id(sem_id);
+}
+
+uint64_t syscall_sem_signal(uint64_t sem_id) {
+    return sem_signal_by_id(sem_id);
+}
+
+uint64_t syscall_sem_set(uint64_t sem_id, int newval) {
+    return sem_set_by_id(sem_id, newval);
+}
+
+uint64_t syscall_sem_get(uint64_t sem_id) {
+    int val = 0;
+    if (!sem_get_value_by_id(sem_id, &val)) return (uint64_t)-1;
+    return (uint64_t)val;
 }

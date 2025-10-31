@@ -35,5 +35,14 @@ uint64_t syscall_getpid(uint64_t unused1, uint64_t unused2, uint64_t unused3, ui
 uint64_t syscall_set_priority(uint64_t pid, uint64_t new_priority, uint64_t unused2, uint64_t unused3, uint64_t unused4);
 uint64_t syscall_wait(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4);
 
+// Semaphore syscalls
+uint64_t syscall_sem_create(int initial);
+uint64_t syscall_sem_open(uint64_t sem_id);
+uint64_t syscall_sem_close(uint64_t sem_id);
+uint64_t syscall_sem_wait(uint64_t sem_id);
+uint64_t syscall_sem_signal(uint64_t sem_id);
+uint64_t syscall_sem_set(uint64_t sem_id, int newval);
+uint64_t syscall_sem_get(uint64_t sem_id);
+
 
 #endif

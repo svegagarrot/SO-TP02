@@ -49,8 +49,12 @@ struct process_control_block {
 
     process_t *queue_next;
     process_t *queue_prev;
-    process_t *waiters_head;
-    process_t *waiter_next;
+        process_t *waiters_head;
+        process_t *waiter_next;
+        /* Waiting on a semaphore (semaphore id) or 0 if none */
+        uint64_t waiting_on_sem;
+        /* Next pointer when enqueued on a semaphore wait queue */
+        process_t *sem_waiter_next;
 };
 
 void process_system_init(void);

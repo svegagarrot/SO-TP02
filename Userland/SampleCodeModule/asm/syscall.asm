@@ -26,6 +26,13 @@ GLOBAL sys_get_type_of_mm
 GLOBAL sys_getpid
 GLOBAL sys_set_priority
 GLOBAL sys_wait
+GLOBAL sys_sem_create
+GLOBAL sys_sem_open
+GLOBAL sys_sem_close
+GLOBAL sys_sem_wait
+GLOBAL sys_sem_signal
+GLOBAL sys_sem_set
+GLOBAL sys_sem_get
 
 
 sys_read:
@@ -257,6 +264,69 @@ sys_wait:
     push rbp
     mov rbp, rsp
     mov rax, 25
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_sem_create:
+    push rbp
+    mov rbp, rsp
+    mov rax, 26
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_sem_open:
+    push rbp
+    mov rbp, rsp
+    mov rax, 27
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_sem_close:
+    push rbp
+    mov rbp, rsp
+    mov rax, 28
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_sem_wait:
+    push rbp
+    mov rbp, rsp
+    mov rax, 29
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_sem_signal:
+    push rbp
+    mov rbp, rsp
+    mov rax, 30
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_sem_set:
+    push rbp
+    mov rbp, rsp
+    mov rax, 31
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_sem_get:
+    push rbp
+    mov rbp, rsp
+    mov rax, 32
     int 0x80
     mov rsp, rbp
     pop rbp

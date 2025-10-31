@@ -1,5 +1,6 @@
 #include "keyboardDriver.h"
 #include "keystate.h"
+#include <naiveConsole.h>
 
 static int buffer_empty();
 static int buffer_full();
@@ -58,6 +59,8 @@ void keyboard_interrupt_handler() {
         request_snapshot();
     } else if (cAscii != 0) {
         buffer_push(cAscii);
+        // Debug: log received char
+        ncPrint("KBD got="); ncPrintChar(cAscii); ncNewline();
     }
 }
 

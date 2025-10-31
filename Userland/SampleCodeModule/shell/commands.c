@@ -8,6 +8,7 @@ extern void _invalidOp();
 extern int64_t test_mm(uint64_t argc, char *argv[]);
 extern int64_t test_processes(uint64_t argc, char *argv[]);
 extern uint64_t test_prio(uint64_t argc, char *argv[]);
+extern uint64_t test_sync(uint64_t argc, char *argv[]);
 extern int mmTypeCmd(int argc, char *argv[]);
 
 const TShellCmd shellCmds[] = {
@@ -19,6 +20,8 @@ const TShellCmd shellCmds[] = {
     {"font-size", fontSizeCmd, ": Cambia el tamanio de la fuente\n"},
     {"testmm", testMMCmd, ": Ejecuta el stress test de memoria. Uso: testmm <max_mem>\n"},
     {"testproceses", testProcesesCmd, ": Ejecuta el stress test de procesos. Uso: testproceses <max_proceses>\n"},
+    {"test_sync", testSyncCmd, ": Ejecuta test sincronizado con semaforos. Uso: test_sync <repeticiones>\n"},
+    {"test_no_synchro", testNoSynchroCmd, ": Ejecuta test sin sincronizacion. Uso: test_no_synchro <repeticiones>\n"},
     {"test_priority", testPriorityCmd, ": Ejecuta el test de prioridades. Uso: test_priority <max_value>\n"},
     {"exceptions", exceptionCmd, ": Testear excepciones. Ingrese: exceptions [zero/invalidOpcode] para testear alguna operacion\n"},
     {"jugar", gameCmd, ": Inicia el modo juego\n"},
@@ -178,6 +181,44 @@ int testMMCmd(int argc, char *argv[]) {
         return CMD_ERROR;
     }
 
+    return OK;
+}
+
+int testSyncCmd(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Uso: test_sync <repeticiones>\n");
+        return CMD_ERROR;
+    }
+
+    /* build argv for test_sync: { repetitions, use_sem }
+       use_sem = 1 for synchronized test */
+    char *targv[2];
+    targv[0] = argv[1];
+    targv[1] = "1";
+
+    int64_t res = (int64_t)test_sync(2, targv);
+    if (res == -1) {
+        printf("test_sync fallo\n");
+        return CMD_ERROR;
+    }
+    return OK;
+}
+
+int testNoSynchroCmd(int argc, char *argv[]) {
+    if (argc != 2) {
+        printf("Uso: test_no_synchro <repeticiones>\n");
+        return CMD_ERROR;
+    }
+
+    char *targv[2];
+    targv[0] = argv[1];
+    targv[1] = "0"; /* do not use sem */
+
+    int64_t res = (int64_t)test_sync(2, targv);
+    if (res == -1) {
+        printf("test_no_synchro fallo\n");
+        return CMD_ERROR;
+    }
     return OK;
 }
 

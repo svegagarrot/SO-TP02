@@ -29,6 +29,13 @@ static SyscallHandler syscallHandlers[] = {
     (SyscallHandler)syscall_getpid,
     (SyscallHandler)syscall_set_priority,
     (SyscallHandler)syscall_wait,
+    (SyscallHandler)syscall_sem_create,
+    (SyscallHandler)syscall_sem_open,
+    (SyscallHandler)syscall_sem_close,
+    (SyscallHandler)syscall_sem_wait,
+    (SyscallHandler)syscall_sem_signal,
+    (SyscallHandler)syscall_sem_set,
+    (SyscallHandler)syscall_sem_get,
 };
 
 #define SYSCALLS_COUNT (sizeof(syscallHandlers) / sizeof(syscallHandlers[0]))

@@ -520,7 +520,10 @@ static void *resolve_function_by_name(const char *name) {
 }
 
 int64_t my_create_process(char *name, void *function, char *argv[]) {
-    if (function == NULL) {
+    // Some tests pass a small integer (argc) instead of NULL as the function
+    // argument (e.g. my_create_process("my_process_inc", 3, argv); ). Treat
+    // small integers as sentinel values and resolve the function by name.
+    if (function == NULL || (uintptr_t)function < 0x10000) {
         function = resolve_function_by_name(name);
         if (function == NULL) {
             return -1; // No se pudo resolver
@@ -555,24 +558,80 @@ int64_t my_nice(uint64_t pid, uint64_t newPrio) {
     return (int64_t)sys_set_priority(pid, newPrio);
 }
 
+/* Simple userland name -> semaphore id mapping so tests can use string names
+   e.g. "sem" as used in test_sync.c. Keeps a small table of open semaphores. */
+#define MAX_USER_SEMS 8
+static char *user_sem_names[MAX_USER_SEMS];
+static uint64_t user_sem_ids[MAX_USER_SEMS];
+
+static int find_sem_index(const char *name) {
+    if (!name) return -1;
+    for (int i = 0; i < MAX_USER_SEMS; ++i) {
+        if (user_sem_names[i] && strcmp(user_sem_names[i], name) == 0) return i;
+    }
+    return -1;
+}
+
+static int find_free_sem_slot(void) {
+    for (int i = 0; i < MAX_USER_SEMS; ++i) if (!user_sem_names[i]) return i;
+    return -1;
+}
+
 int64_t my_sem_open(char *sem_id, uint64_t initialValue) {
-    return 0;
+    if (!sem_id) return 0;
+    int idx = find_sem_index(sem_id);
+    if (idx >= 0) {
+        /* already opened: bump kernel refcount */
+        sys_sem_open(user_sem_ids[idx]);
+        return 1;
+    }
+    int free = find_free_sem_slot();
+    if (free < 0) return 0;
+    uint64_t id = sys_sem_create((int)initialValue);
+    if (!id) return 0;
+    size_t len = strlen(sem_id) + 1;
+    char *copy = (char *)malloc(len);
+    if (!copy) {
+        sys_sem_close(id);
+        return 0;
+    }
+    for (size_t i = 0; i < len; ++i) copy[i] = sem_id[i];
+    user_sem_names[free] = copy;
+    user_sem_ids[free] = id;
+    return 1;
 }
 
 int64_t my_sem_wait(char *sem_id) {
-    return 0;
+    if (!sem_id) return 0;
+    int idx = find_sem_index(sem_id);
+    if (idx < 0) return 0;
+    return (int64_t)sys_sem_wait(user_sem_ids[idx]);
 }
 
 int64_t my_sem_post(char *sem_id) {
-    return 0;
+    if (!sem_id) return 0;
+    int idx = find_sem_index(sem_id);
+    if (idx < 0) return 0;
+    return (int64_t)sys_sem_signal(user_sem_ids[idx]);
 }
 
 int64_t my_sem_close(char *sem_id) {
-    return 0;
+    if (!sem_id) return 0;
+    int idx = find_sem_index(sem_id);
+    if (idx < 0) return 0;
+    uint64_t id = user_sem_ids[idx];
+    int64_t res = (int64_t)sys_sem_close(id);
+    free(user_sem_names[idx]);
+    user_sem_names[idx] = NULL;
+    user_sem_ids[idx] = 0;
+    return res;
 }
 
 int64_t my_yield() {
-    return 0;
+    /* Best-effort cooperative yield: sleep 1ms to allow timer interrupts
+       and scheduler to run. */
+    sys_sleep(1);
+    return 1;
 }
 
 int64_t my_wait(int64_t pid) {

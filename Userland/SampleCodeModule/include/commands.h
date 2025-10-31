@@ -26,6 +26,8 @@ int fontSizeCmd(int argc, char *argv[]);
 int testMMCmd(int argc, char *argv[]);
 int testProcesesCmd(int argc, char *argv[]);
 int testPriorityCmd(int argc, char *argv[]);
+int testSyncCmd(int argc, char *argv[]);
+int testNoSynchroCmd(int argc, char *argv[]);
 int fillCommandAndArgs(char *args[], char *input);  
 int CommandParse(char *commandInput);
 int exceptionCmd(int argc, char *argv[]);

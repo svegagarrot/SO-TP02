@@ -2,6 +2,7 @@
 #include "process.h"
 #include "time.h"
 #include "interrupts.h"
+#include <naiveConsole.h>
 #include <stddef.h>
 #include <stdbool.h>
 
@@ -79,6 +80,8 @@ static void save_context(process_t *p, uint64_t current_rsp) {
             } 
             break;
         case PROCESS_STATE_BLOCKED:
+            // Debug: a process is being moved to blocked queue
+            ncPrint("SCHED block pid="); ncPrintDec(p->pid); ncNewline();
             process_queue_push(&blocked_q, p);
             break;
         case PROCESS_STATE_FINISHED:
@@ -148,6 +151,9 @@ uint64_t schedule(uint64_t current_rsp) {
     if (!next) {
         next = idle_p;
     }
+
+    // Debug: switching to next process
+    ncPrint("SCHED switch to pid="); ncPrintDec(next->pid); ncNewline();
 
     next->state = PROCESS_STATE_RUNNING;
     current = next;

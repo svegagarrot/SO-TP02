@@ -30,4 +30,11 @@ uint64_t sys_get_type_of_mm(char *user_buf, int buflen);
 uint64_t sys_getpid();
 uint64_t sys_set_priority(uint64_t pid, uint64_t new_priority);
 uint64_t sys_wait(uint64_t pid);
+uint64_t sys_sem_create(int initial);
+uint64_t sys_sem_open(uint64_t sem_id);
+uint64_t sys_sem_close(uint64_t sem_id);
+uint64_t sys_sem_wait(uint64_t sem_id);
+uint64_t sys_sem_signal(uint64_t sem_id);
+uint64_t sys_sem_set(uint64_t sem_id, int newval);
+uint64_t sys_sem_get(uint64_t sem_id);
 #endif
