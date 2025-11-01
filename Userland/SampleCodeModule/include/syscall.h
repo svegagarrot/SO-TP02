@@ -38,4 +38,5 @@ uint64_t sys_sem_signal(uint64_t sem_id);
 uint64_t sys_sem_set(uint64_t sem_id, int newval);
 uint64_t sys_sem_get(uint64_t sem_id);
 uint64_t sys_list_processes(void *buffer, uint64_t max_count);
+uint64_t sys_yield();
 #endif

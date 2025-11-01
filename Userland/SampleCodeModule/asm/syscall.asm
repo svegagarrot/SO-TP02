@@ -34,6 +34,7 @@ GLOBAL sys_sem_signal
 GLOBAL sys_sem_set
 GLOBAL sys_sem_get
 GLOBAL sys_list_processes
+GLOBAL sys_yield
 
 
 sys_read:
@@ -337,6 +338,15 @@ sys_list_processes:
     push rbp
     mov rbp, rsp
     mov rax, 33
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_yield:
+    push rbp
+    mov rbp, rsp
+    mov rax, 34
     int 0x80
     mov rsp, rbp
     pop rbp

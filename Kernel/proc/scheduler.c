@@ -202,6 +202,13 @@ void scheduler_block_current(void) {
     need_resched = 1;
 }
 
+void scheduler_yield_current(void) {
+    if (!current || current == idle_p) {
+        return;
+    }
+    need_resched = 1;
+}
+
 void scheduler_unblock_process(process_t *p) {
     if (!p) {
         return;

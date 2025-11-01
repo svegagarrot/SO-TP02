@@ -15,6 +15,7 @@ process_t *scheduler_spawn_process(const char *name,
                                    process_t *parent);
 
 void scheduler_block_current(void);
+void scheduler_yield_current(void);
 void scheduler_unblock_process(process_t *p);
 void scheduler_finish_current(void);
 process_t *scheduler_collect_finished(void);

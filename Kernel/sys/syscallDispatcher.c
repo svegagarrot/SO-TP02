@@ -37,6 +37,7 @@ static SyscallHandler syscallHandlers[] = {
     (SyscallHandler)syscall_sem_set,
     (SyscallHandler)syscall_sem_get,
     (SyscallHandler)syscall_list_processes,
+    (SyscallHandler)syscall_yield,
 };
 
 #define SYSCALLS_COUNT (sizeof(syscallHandlers) / sizeof(syscallHandlers[0]))

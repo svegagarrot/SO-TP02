@@ -694,10 +694,7 @@ int64_t my_sem_close(char *sem_id) {
 }
 
 int64_t my_yield() {
-    /* Best-effort cooperative yield: sleep 1ms to allow timer interrupts
-       and scheduler to run. */
-    sys_sleep(1);
-    return 1;
+    return (int64_t)sys_yield();
 }
 
 int64_t my_wait(int64_t pid) {

@@ -266,3 +266,12 @@ uint64_t syscall_list_processes(uint64_t user_addr, uint64_t max_count, uint64_t
     uint64_t count = scheduler_list_all_processes((process_info_t *)user_addr, max_count);
     return count;
 }
+
+uint64_t syscall_yield(uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4, uint64_t unused5) {
+    process_t *p = scheduler_current_process();
+    if (!p) {
+        return 0;
+    }
+    scheduler_yield_current();
+    return 1;
+}
