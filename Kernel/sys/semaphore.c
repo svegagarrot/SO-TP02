@@ -10,16 +10,6 @@
 
 typedef volatile uint8_t lock_t;
 
-static inline void lock_acquire(lock_t *l) {
-    while (__atomic_test_and_set(l, __ATOMIC_ACQUIRE)) {
-        // busy wait (short), acceptable for this assignment on single-core
-    }
-}
-
-static inline void lock_release(lock_t *l) {
-    __atomic_clear(l, __ATOMIC_RELEASE);
-}
-
 typedef struct semaphore_t {
     uint64_t id;
     int value;
@@ -64,25 +54,25 @@ uint64_t sem_alloc(int initial_value) {
 int sem_open_by_id(uint64_t id) {
     semaphore_t *s = sem_get_by_id(id);
     if (!s) return 0;
-    lock_acquire(&s->lock);
+    acquire(&s->lock);
     s->refcount++;
-    lock_release(&s->lock);
+    release(&s->lock);
     return 1;
 }
 
 int sem_close_by_id(uint64_t id) {
     semaphore_t *s = sem_get_by_id(id);
     if (!s) return 0;
-    lock_acquire(&s->lock);
+    acquire(&s->lock);
     s->refcount--;
     int ref = s->refcount;
-    lock_release(&s->lock);
+    release(&s->lock);
     if (ref <= 0) {
         // free: ensure no waiters
-        lock_acquire(&s->lock);
+        acquire(&s->lock);
         s->used = 0;
         s->wait_head = s->wait_tail = NULL;
-        lock_release(&s->lock);
+        release(&s->lock);
     }
     return 1;
 }
@@ -113,16 +103,16 @@ int sem_wait_by_id(uint64_t id) {
     process_t *me = scheduler_current_process();
     if (!me) return 0;
 
-    lock_acquire(&s->lock);
+    acquire(&s->lock);
     if (s->value > 0) {
         s->value--;
-        lock_release(&s->lock);
+        release(&s->lock);
         return 1;
     }
     // enqueue and mark waiting_on_sem
     me->waiting_on_sem = s->id;
     enqueue_waiter(s, me);
-    lock_release(&s->lock);
+    release(&s->lock);
 
     // Debug: show that the process will block on this semaphore
     ncPrint("SEM wait pid="); ncPrintDec(me->pid); ncPrint(" sem="); ncPrintDec(s->id); ncNewline();
@@ -136,7 +126,7 @@ int sem_signal_by_id(uint64_t id) {
     semaphore_t *s = sem_get_by_id(id);
     if (!s) return 0;
 
-    lock_acquire(&s->lock);
+    acquire(&s->lock);
     process_t *w = dequeue_waiter(s);
     if (w) {
         w->waiting_on_sem = 0;
@@ -147,7 +137,7 @@ int sem_signal_by_id(uint64_t id) {
     } else {
         s->value++;
     }
-    lock_release(&s->lock);
+    release(&s->lock);
     return 1;
 }
 
@@ -156,7 +146,7 @@ int sem_set_by_id(uint64_t id, int newval) {
     if (!s) return 0;
     if (newval < 0) return 0;
 
-    lock_acquire(&s->lock);
+    acquire(&s->lock);
     // wake up up to newval waiters
     int awaken = 0;
     while (awaken < newval) {
@@ -167,15 +157,15 @@ int sem_set_by_id(uint64_t id, int newval) {
         awaken++;
     }
     s->value = newval - awaken;
-    lock_release(&s->lock);
+    release(&s->lock);
     return 1;
 }
 
 int sem_get_value_by_id(uint64_t id, int *out) {
     semaphore_t *s = sem_get_by_id(id);
     if (!s || !out) return 0;
-    lock_acquire(&s->lock);
+    acquire(&s->lock);
     *out = s->value;
-    lock_release(&s->lock);
+    release(&s->lock);
     return 1;
 }

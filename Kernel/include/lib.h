@@ -7,4 +7,8 @@ void * memset(void * destination, int32_t character, uint64_t length);
 void * memcpy(void * destination, const void * source, uint64_t length);
 char *cpuVendor(char *result);
 
+// Funciones de locks atómicos implementadas en assembler
+void acquire(volatile uint8_t *lock);
+void release(volatile uint8_t *lock);
+
 #endif

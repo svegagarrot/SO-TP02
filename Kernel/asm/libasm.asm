@@ -5,6 +5,8 @@ GLOBAL inb
 GLOBAL outb
 GLOBAL outw
 GLOBAL process_user_entry
+GLOBAL acquire
+GLOBAL release
 
 section .text
 	
@@ -96,4 +98,15 @@ process_user_entry:
     call rsi            
     pop r8               
     mov rsp, r8           
+    ret
+
+acquire:
+    mov al, 1
+    xchg al, [rdi]
+    cmp al, 0
+    jne acquire
+    ret
+
+release:
+    mov byte [rdi], 0
     ret
