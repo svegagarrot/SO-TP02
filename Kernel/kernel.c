@@ -52,18 +52,20 @@ static void cpu_pause(volatile uint64_t iters) {
 
 static void procA(void *arg) {
     (void)arg;
-    for (;;) {
+   while(1) {
         video_putChar('A', FOREGROUND_COLOR, BACKGROUND_COLOR);
-        cpu_pause(5000000);
+        scheduler_yield_current();  // Test yield: debería cambiar a procB
     }
+    scheduler_finish_current();
 }
 
 static void procB(void *arg) {
     (void)arg;
-    for (;;) {
+    while(1) {
         video_putChar('B', FOREGROUND_COLOR, BACKGROUND_COLOR);
-        cpu_pause(5000000);
+        scheduler_yield_current();  // Test yield: debería cambiar a procA
     }
+    scheduler_finish_current();
 }
 
 void * initializeKernelBinary()
@@ -86,9 +88,9 @@ int main()
 	mm_init_default();
 	init_scheduler();
 
-	//scheduler_spawn_process("A", procA, NULL, NULL);
-	//scheduler_spawn_process("B", procB, NULL, NULL);
-	scheduler_spawn_process("shell", (void*)sampleCodeModuleAddress, NULL, NULL);	
+	scheduler_spawn_process("A", procA, NULL, NULL);
+	scheduler_spawn_process("B", procB, NULL, NULL);
+	//scheduler_spawn_process("shell", (void*)sampleCodeModuleAddress, NULL, NULL);	
 
 	load_idt();
 	_sti();

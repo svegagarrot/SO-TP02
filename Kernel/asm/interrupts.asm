@@ -19,6 +19,7 @@ GLOBAL _getSnapshot
 
 GLOBAL process_start
 GLOBAL setup_process_context
+GLOBAL callTimerTick
 
 EXTERN scheduler_finish_current
 EXTERN schedule
@@ -92,6 +93,10 @@ _cli:
 
 _sti:
 	sti
+	ret
+
+callTimerTick:
+	int 20h
 	ret
 
 picMasterMask:

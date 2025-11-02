@@ -21,5 +21,6 @@ void _hlt(void);
 void picMasterMask(uint8_t mask);
 void picSlaveMask(uint8_t mask);
 void haltcpu(void);
+void callTimerTick(void);
 
 #endif 

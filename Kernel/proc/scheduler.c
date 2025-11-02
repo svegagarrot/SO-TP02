@@ -206,7 +206,9 @@ void scheduler_yield_current(void) {
     if (!current || current == idle_p) {
         return;
     }
-    need_resched = 1;
+    // Forzar expiración del quantum para cambio inmediato
+    last_switch_tick = ticks_elapsed() - QUANTUM_TICKS;  // quantum = 0 (siguiente!!)
+    callTimerTick();
 }
 
 void scheduler_unblock_process(process_t *p) {
