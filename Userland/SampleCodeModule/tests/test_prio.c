@@ -17,7 +17,7 @@ void zero_to_max() {
 
   while (value++ != max_value);
 
-  printf("PROCESS %d DONE!\n", my_getpid());
+  printf("PROCESS %lld DONE!\n", my_getpid());
 }
 
 uint64_t test_prio(uint64_t argc, char *argv[]) {
@@ -46,7 +46,7 @@ uint64_t test_prio(uint64_t argc, char *argv[]) {
   for (i = 0; i < TOTAL_PROCESSES; i++) {
     pids[i] = my_create_process("zero_to_max", zero_to_max, ztm_argv, 0);
     my_nice(pids[i], prio[i]);
-    printf("  PROCESS %d NEW PRIORITY: %d\n", pids[i], prio[i]);
+    printf("  PROCESS %lld NEW PRIORITY: %d\n", pids[i], prio[i]);
   }
 
   // Expect the priorities to take effect
@@ -60,7 +60,7 @@ uint64_t test_prio(uint64_t argc, char *argv[]) {
     pids[i] = my_create_process("zero_to_max", zero_to_max, ztm_argv, 0);
     my_block(pids[i]);
     my_nice(pids[i], prio[i]);
-    printf("  PROCESS %D NEW PRIORITY: %d\n", pids[i], prio[i]);
+    printf("  PROCESS %lld NEW PRIORITY: %d\n", pids[i], prio[i]);
   }
 
   for (i = 0; i < TOTAL_PROCESSES; i++)
