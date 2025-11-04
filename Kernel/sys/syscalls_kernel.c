@@ -209,23 +209,32 @@ uint64_t syscall_set_priority(uint64_t pid, uint64_t newPrio, uint64_t unused2, 
     return (uint64_t)scheduler_set_priority(pid, (uint8_t)newPrio);
 }
 
-uint64_t syscall_wait(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+uint64_t syscall_wait(uint64_t pid, uint64_t, uint64_t, uint64_t, uint64_t) {
     if ((int64_t)pid <= 0) return 0;
+
     process_t *target = scheduler_find_by_pid(pid);
     if (!target) return 0;
 
+    // Si ya terminó, no bloquees
     if (target->state == PROCESS_STATE_FINISHED) {
         return 1;
     }
 
     process_t *me = scheduler_current_process();
-    if (!me || me == target || me == NULL) return 0;
+    if (!me || me == target) return 0;
+
+    // Enlazarme en la lista de waiters del 'target'
     me->waiting_on_pid = pid;
-    me->waiter_next = target->waiters_head;
+    me->waiter_next = target->waiters_head;     // (LIFO; si querés FIFO, usar tail)
     target->waiters_head = me;
+
+    // BLOQUEAR y FORZAR RESCHEDULE INMEDIATO
     scheduler_block_current();
+    scheduler_yield_current();                  // <- FALTA EN TU CÓDIGO
+
     return 1;
 }
+
 
 uint64_t syscall_sem_create(int initial) {
     if (initial < 0) return 0;

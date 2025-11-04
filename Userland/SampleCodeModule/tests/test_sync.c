@@ -1,6 +1,7 @@
 #include <stdint.h>
-#include "lib.h"
+#include "syscall.h"
 #include "test_util.h"
+#include "../include/lib.h"
 
 #define SEM_ID "sem"
 #define TOTAL_PAIR_PROCESSES 2
@@ -14,20 +15,28 @@ void slowInc(int64_t *p, int64_t inc) {
   *p = aux;
 }
 
-uint64_t my_process_inc(uint64_t argc, char *argv[]) {
+/* Cuenta elementos de argv hasta NULL */
+static uint64_t count_argv(char *argv[]) {
+  uint64_t c = 0;
+  while (argv && argv[c] != NULL) c++;
+  return c;
+}
+
+uint64_t my_process_inc(char *argv[]) {
   uint64_t n;
   int8_t inc;
   int8_t use_sem;
 
+  uint64_t argc = count_argv(argv);
   if (argc != 3)
-    return -1;
+    return (uint64_t)-1;
 
   if ((n = satoi(argv[0])) <= 0)
-    return -1;
+    return (uint64_t)-1;
   if ((inc = satoi(argv[1])) == 0)
-    return -1;
+    return (uint64_t)-1;
   if ((use_sem = satoi(argv[2])) < 0)
-    return -1;
+    return (uint64_t)-1;
 
   if (use_sem)
     if (!my_sem_open(SEM_ID, 1)) {
@@ -63,8 +72,8 @@ uint64_t test_sync(uint64_t argc, char *argv[]) { //{n, use_sem, 0}
 
   uint64_t i;
   for (i = 0; i < TOTAL_PAIR_PROCESSES; i++) {
-    pids[i] = my_create_process("my_process_inc", (void *)3, argvDec);
-    pids[i + TOTAL_PAIR_PROCESSES] = my_create_process("my_process_inc", (void *)3, argvInc);
+    pids[i] = my_create_process("my_process_inc", NULL, argvDec);
+    pids[i + TOTAL_PAIR_PROCESSES] = my_create_process("my_process_inc", NULL, argvInc);
   }
 
   for (i = 0; i < TOTAL_PAIR_PROCESSES; i++) {
@@ -72,7 +81,7 @@ uint64_t test_sync(uint64_t argc, char *argv[]) { //{n, use_sem, 0}
     my_wait(pids[i + TOTAL_PAIR_PROCESSES]);
   }
 
-  printf("Final value: %d\n", global);
+  printf("Final value: %lld\n", (long long)global);
 
   return 0;
 }

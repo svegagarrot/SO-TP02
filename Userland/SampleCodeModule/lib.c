@@ -576,7 +576,7 @@ static void *resolve_function_by_name(const char *name) {
     void endless_loop(void);
     void endless_loop_print(uint64_t wait);
     // test_sync.c
-    uint64_t my_process_inc(uint64_t argc, char *argv[]);
+    uint64_t my_process_inc(char *argv[]);
 
     if (strcmp(name, "zero_to_max") == 0) return (void *)zero_to_max;
     if (strcmp(name, "endless_loop") == 0) return (void *)endless_loop;

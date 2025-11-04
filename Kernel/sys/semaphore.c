@@ -114,11 +114,10 @@ int sem_wait_by_id(uint64_t id) {
     enqueue_waiter(s, me);
     release(&s->lock);
 
-    // Debug: show that the process will block on this semaphore
-    ncPrint("SEM wait pid="); ncPrintDec(me->pid); ncPrint(" sem="); ncPrintDec(s->id); ncNewline();
-
-    // Mark blocked and let scheduler move it to blocked queue on next schedule
+    // Marcar bloqueado y forzar cambio inmediato para que no continúe ejecutando
+    // hasta que el scheduler efectivamente lo mueva a la cola de bloqueados.
     scheduler_block_current();
+    scheduler_yield_current();
     return 1;
 }
 
@@ -132,8 +131,6 @@ int sem_signal_by_id(uint64_t id) {
         w->waiting_on_sem = 0;
         // Unblock using scheduler helper
         scheduler_unblock_process(w);
-        // Debug: we signaled and unblocked a waiter
-        ncPrint("SEM signal unblocked pid="); ncPrintDec(w->pid); ncPrint(" sem="); ncPrintDec(s->id); ncNewline();
     } else {
         s->value++;
     }

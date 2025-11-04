@@ -191,18 +191,23 @@ int testMMCmd(int argc, char *argv[]) {
 }
 
 int testSyncCmd(int argc, char *argv[]) {
-    if (argc != 2) {
-        printf("Uso: test_sync <repeticiones>\n");
+    if (argc < 2 || argc > 3) {
+        printf("Uso: test_sync <repeticiones> [num_pares]\n");
+        printf("  repeticiones: número de iteraciones por proceso\n");
+        printf("  num_pares: número de pares de procesos (opcional, default=2)\n");
         return CMD_ERROR;
     }
 
-    /* build argv for test_sync: { repetitions, use_sem }
+    /* build argv for test_sync: { repetitions, use_sem, [num_pairs] }
        use_sem = 1 for synchronized test */
-    char *targv[2];
+    char *targv[3];
     targv[0] = argv[1];
     targv[1] = "1";
+    if (argc == 3) {
+        targv[2] = argv[2];  // número de pares especificado
+    }
 
-    int64_t res = (int64_t)test_sync(2, targv);
+    int64_t res = (int64_t)test_sync(argc == 3 ? 3 : 2, targv);
     if (res == -1) {
         printf("test_sync fallo\n");
         return CMD_ERROR;
@@ -211,16 +216,21 @@ int testSyncCmd(int argc, char *argv[]) {
 }
 
 int testNoSynchroCmd(int argc, char *argv[]) {
-    if (argc != 2) {
-        printf("Uso: test_no_synchro <repeticiones>\n");
+    if (argc < 2 || argc > 3) {
+        printf("Uso: test_no_synchro <repeticiones> [num_pares]\n");
+        printf("  repeticiones: número de iteraciones por proceso\n");
+        printf("  num_pares: número de pares de procesos (opcional, default=2)\n");
         return CMD_ERROR;
     }
 
-    char *targv[2];
+    char *targv[3];
     targv[0] = argv[1];
     targv[1] = "0"; /* do not use sem */
+    if (argc == 3) {
+        targv[2] = argv[2];  // número de pares especificado
+    }
 
-    int64_t res = (int64_t)test_sync(2, targv);
+    int64_t res = (int64_t)test_sync(argc == 3 ? 3 : 2, targv);
     if (res == -1) {
         printf("test_no_synchro fallo\n");
         return CMD_ERROR;
