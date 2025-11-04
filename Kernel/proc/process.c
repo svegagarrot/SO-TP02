@@ -45,6 +45,9 @@ process_t *process_create(const char *name,
     p->entry_arg   = entry_arg;
     p->state       = PROCESS_STATE_NEW;
     p->is_foreground = is_foreground;  // Inicializar campo is_foreground
+    p->priority      = PROCESS_PRIORITY_DEFAULT;
+    p->base_priority = PROCESS_PRIORITY_DEFAULT;
+    p->wait_ticks    = 0;
 
     copy_name(p, name);
 

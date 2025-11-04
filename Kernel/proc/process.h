@@ -29,6 +29,8 @@ struct process_control_block {
 
     process_state_t state;
     int             priority;
+    int             base_priority;  // Prioridad original antes de aging
+    uint64_t        wait_ticks;     // Contador para aging/anti-starvation
 
     uint64_t rsp;
     uint64_t rbp;

@@ -9,6 +9,10 @@
 #define QUANTUM_TICKS 8
 #define MAX_FINISHED_COLLECT 4
 
+// Parámetros de aging para prevenir starvation
+#define AGING_THRESHOLD 32      // Ticks de espera antes de boost
+#define AGING_BOOST 1          // Cuánto aumentar la prioridad
+
 // Flag global para forzar reschedule inmediato
 static volatile int need_resched = 0;
 
@@ -54,6 +58,36 @@ static process_t *ready_queue_pop_highest(void) {
 static void idle_entry(void *unused) {
     (void)unused;
     for (;;) { _hlt(); }
+}
+
+// Función de aging: incrementa wait_ticks y aplica boost si es necesario
+static void apply_aging(void) {
+    for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
+        process_t *p = ready_queues[pr].head;
+        while (p) {
+            p->wait_ticks++;
+            
+            // Si esperó suficiente y no está en máxima prioridad, hacer boost
+            if (p->wait_ticks >= AGING_THRESHOLD && p->priority < PROCESS_PRIORITY_MAX) {
+                // Remover de la cola actual
+                process_queue_remove(&ready_queues[pr], p);
+                
+                // Aumentar prioridad temporalmente
+                p->priority = clamp_priority(p->priority + AGING_BOOST);
+                
+                // Reinsertar en la nueva cola de prioridad
+                process_queue_push(&ready_queues[p->priority], p);
+                
+                // Resetear contador
+                p->wait_ticks = 0;
+                
+                // Como modificamos la cola, reiniciar el recorrido
+                p = ready_queues[pr].head;
+            } else {
+                p = p->queue_next;
+            }
+        }
+    }
 }
 
 // Guardar contexto del proceso saliente y re-ubicarlo en la cola correcta
@@ -122,6 +156,9 @@ uint64_t schedule(uint64_t current_rsp) {
 
     uint64_t now = ticks_elapsed();
 
+    // Aplicar aging para prevenir starvation
+    apply_aging();
+
     // Preemptivo: chequeo de need_resched y condiciones de cambio
     bool quantum_expired = (now - last_switch_tick) >= QUANTUM_TICKS;
     bool must_switch = (current->state != PROCESS_STATE_RUNNING);
@@ -151,6 +188,15 @@ uint64_t schedule(uint64_t current_rsp) {
     }
 
     next->state = PROCESS_STATE_RUNNING;
+    
+    // Resetear contador de espera cuando el proceso se ejecuta
+    next->wait_ticks = 0;
+    
+    // Si la prioridad fue boosteada por aging, restaurar la base
+    if (next != idle_p && next->priority > next->base_priority) {
+        next->priority = next->base_priority;
+    }
+    
     current = next;
     last_switch_tick = now;
 
@@ -319,6 +365,7 @@ int scheduler_set_priority(uint64_t pid, uint8_t new_priority) {
     }
 
     p->priority = clamped;
+    p->base_priority = clamped;  // También actualizar base_priority
 
     if (p->state == PROCESS_STATE_READY) {
         ready_queue_push(p);
