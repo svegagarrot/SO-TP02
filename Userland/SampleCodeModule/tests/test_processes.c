@@ -34,7 +34,7 @@ int64_t test_processes(uint64_t argc, char *argv[]) {
     // Create max_processes processes
     for (rq = 0; rq < max_processes; rq++) {
       printf("Creando proceso %d... ", rq + 1);
-      p_rqs[rq].pid = my_create_process("endless_loop", endless_loop, argvAux);
+      p_rqs[rq].pid = my_create_process("endless_loop", endless_loop, argvAux, 0);  // background
 
       if (p_rqs[rq].pid == -1) {
         printf("ERROR\n");

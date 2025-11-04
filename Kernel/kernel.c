@@ -88,9 +88,9 @@ int main()
 	mm_init_default();
 	init_scheduler();
 
-	//scheduler_spawn_process("A", procA, NULL, NULL);
-	//scheduler_spawn_process("B", procB, NULL, NULL);
-	scheduler_spawn_process("shell", (void*)sampleCodeModuleAddress, NULL, NULL);	
+	//scheduler_spawn_process("A", procA, NULL, NULL, 0);
+	//scheduler_spawn_process("B", procB, NULL, NULL, 0);
+	scheduler_spawn_process("shell", (void*)sampleCodeModuleAddress, NULL, NULL, 1);  // shell en foreground
 
 	load_idt();
 	_sti();

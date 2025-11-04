@@ -12,7 +12,8 @@ void scheduler_add_process(process_t *p);
 process_t *scheduler_spawn_process(const char *name,
                                    process_entry_point_t entry_point,
                                    void *entry_arg,
-                                   process_t *parent);
+                                   process_t *parent,
+                                   int is_foreground);
 
 void scheduler_block_current(void);
 void scheduler_yield_current(void);

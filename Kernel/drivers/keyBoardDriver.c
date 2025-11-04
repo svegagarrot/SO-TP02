@@ -59,8 +59,6 @@ void keyboard_interrupt_handler() {
         request_snapshot();
     } else if (cAscii != 0) {
         buffer_push(cAscii);
-        // Debug: log received char
-        ncPrint("KBD got="); ncPrintChar(cAscii); ncNewline();
     }
 }
 

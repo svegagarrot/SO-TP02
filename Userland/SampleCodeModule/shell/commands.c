@@ -4,12 +4,78 @@
 #include "../include/syscall.h"
 #include "../include/game.h"
 
+int g_run_in_background = 0;
+
 extern void _invalidOp();
 extern int64_t test_mm(uint64_t argc, char *argv[]);
 extern int64_t test_processes(uint64_t argc, char *argv[]);
 extern uint64_t test_prio(uint64_t argc, char *argv[]);
 extern uint64_t test_sync(uint64_t argc, char *argv[]);
 extern int mmTypeCmd(int argc, char *argv[]);
+
+// Wrapper para test_mm que se puede ejecutar como proceso
+static void test_mm_process_wrapper(void *arg) {
+    char **argv = (char **)arg;
+    if (argv != NULL && argv[0] != NULL) {
+        char *args[2];
+        args[0] = argv[0];
+        args[1] = NULL;
+        test_mm(1, args);
+        // Liberar memoria
+        free(argv[0]);
+        free(argv);
+    }
+}
+
+// Wrapper para test_processes que se puede ejecutar como proceso
+static void test_processes_wrapper(void *arg) {
+    char **argv = (char **)arg;
+    if (argv != NULL && argv[0] != NULL) {
+        char *args[2];
+        args[0] = argv[0];
+        args[1] = NULL;
+        test_processes(1, args);
+        // Liberar memoria
+        free(argv[0]);
+        free(argv);
+    }
+}
+
+// Wrapper para test_prio que se puede ejecutar como proceso
+static void test_prio_wrapper(void *arg) {
+    char **argv = (char **)arg;
+    if (argv != NULL && argv[0] != NULL) {
+        char *args[2];
+        args[0] = argv[0];
+        args[1] = NULL;
+        test_prio(1, args);
+        // Liberar memoria
+        free(argv[0]);
+        free(argv);
+    }
+}
+
+// Wrapper para test_sync que se puede ejecutar como proceso
+static void test_sync_wrapper(void *arg) {
+    char **argv = (char **)arg;
+    if (argv != NULL && argv[0] != NULL) {
+        // argv[0] = repeticiones, argv[1] = num_pares (puede ser NULL)
+        int argc = (argv[1] != NULL) ? 2 : 1;
+        char *args[3];
+        args[0] = argv[0];
+        args[1] = "1"; // use_sem = 1 para sync
+        if (argv[1] != NULL) {
+            args[2] = argv[1];
+            test_sync(3, args);
+        } else {
+            test_sync(2, args);
+        }
+        // Liberar memoria
+        free(argv[0]);
+        if (argv[1]) free(argv[1]);
+        free(argv);
+    }
+}
 
 const TShellCmd shellCmds[] = {
     {"help", helpCmd, ": Muestra los comandos disponibles\n"},
@@ -125,9 +191,24 @@ int CommandParse(char *commandInput){
     if(argc == 0)
         return ERROR;
 
+    // Detectar si el último argumento es "&" para ejecutar en background
+    int is_background = 0;
+    if (argc > 0 && strcmp(args[argc - 1], "&") == 0) {
+        is_background = 1;
+        argc--;  // Remover el "&" de los argumentos
+        if (argc == 0) {
+            return ERROR;  // Solo había "&", comando inválido
+        }
+    }
+
     for(int i = 0; shellCmds[i].name; i++) {
         if(strcmp(args[0], shellCmds[i].name) == 0) {
-            return shellCmds[i].function(argc, args);
+            // Pasar información de background a través de una variable global temporal
+            extern int g_run_in_background;
+            g_run_in_background = is_background;
+            int result = shellCmds[i].function(argc, args);
+            g_run_in_background = 0;  // Reset
+            return result;
         }
     }
 
@@ -176,43 +257,146 @@ int exceptionCmd(int argc, char * argv[]) {
 }
 
 int testMMCmd(int argc, char *argv[]) {
+    extern int g_run_in_background;
+    
     if (argc != 2) {
-        printf("Uso: testmm <max_mem>\n");
+        printf("Uso: testmm <max_mem> [&]\n");
         return CMD_ERROR;
     }
 
-    int64_t result = test_mm(argc - 1, argv + 1);
-    if (result == -1) {
-        printf("testmm fallo\n");
-        return CMD_ERROR;
+    // Si se ejecuta en background, crear un proceso
+    if (g_run_in_background) {
+        // Copiar argumentos para el proceso
+        char **process_argv = (char **)malloc(2 * sizeof(char *));
+        if (process_argv == NULL) {
+            printf("Error: no se pudo asignar memoria para el proceso.\n");
+            return CMD_ERROR;
+        }
+        
+        char *arg_copy = (char *)malloc(strlen(argv[1]) + 1);
+        if (arg_copy == NULL) {
+            free(process_argv);
+            printf("Error: no se pudo asignar memoria para el proceso.\n");
+            return CMD_ERROR;
+        }
+        
+        // Copiar manualmente
+        int idx = 0;
+        while (argv[1][idx] != '\0') {
+            arg_copy[idx] = argv[1][idx];
+            idx++;
+        }
+        arg_copy[idx] = '\0';
+        process_argv[0] = arg_copy;
+        process_argv[1] = NULL;
+        
+        // Usar el wrapper en lugar de test_mm directamente
+        int64_t pid = my_create_process("test_mm", test_mm_process_wrapper, process_argv, 0);  // background
+        if (pid <= 0) {
+            free(arg_copy);
+            free(process_argv);
+            printf("Error: no se pudo crear el proceso test_mm.\n");
+            return CMD_ERROR;
+        }
+        
+        printf("Test de memoria iniciado con PID: %lld (background)\n", pid);
+        return OK;
+    } else {
+        // Ejecutar directamente en foreground (modo actual)
+        int64_t result = test_mm(argc - 1, argv + 1);
+        if (result == -1) {
+            printf("testmm fallo\n");
+            return CMD_ERROR;
+        }
+        return OK;
     }
-
-    return OK;
 }
 
 int testSyncCmd(int argc, char *argv[]) {
+    extern int g_run_in_background;
+    
     if (argc < 2 || argc > 3) {
-        printf("Uso: test_sync <repeticiones> [num_pares]\n");
+        printf("Uso: test_sync <repeticiones> [num_pares] [&]\n");
         printf("  repeticiones: número de iteraciones por proceso\n");
         printf("  num_pares: número de pares de procesos (opcional, default=2)\n");
         return CMD_ERROR;
     }
 
-    /* build argv for test_sync: { repetitions, use_sem, [num_pairs] }
-       use_sem = 1 for synchronized test */
-    char *targv[3];
-    targv[0] = argv[1];
-    targv[1] = "1";
-    if (argc == 3) {
-        targv[2] = argv[2];  // número de pares especificado
-    }
+    // Si se ejecuta en background, crear un proceso
+    if (g_run_in_background) {
+        // Necesitamos 2 o 3 argumentos: repeticiones, use_sem=1, [num_pares]
+        int num_args = (argc == 3) ? 3 : 2;
+        char **process_argv = (char **)malloc(num_args * sizeof(char *));
+        if (process_argv == NULL) {
+            printf("Error: no se pudo asignar memoria para el proceso.\n");
+            return CMD_ERROR;
+        }
+        
+        // Copiar repeticiones
+        char *arg1_copy = (char *)malloc(strlen(argv[1]) + 1);
+        if (arg1_copy == NULL) {
+            free(process_argv);
+            printf("Error: no se pudo asignar memoria para el proceso.\n");
+            return CMD_ERROR;
+        }
+        int idx = 0;
+        while (argv[1][idx] != '\0') {
+            arg1_copy[idx] = argv[1][idx];
+            idx++;
+        }
+        arg1_copy[idx] = '\0';
+        process_argv[0] = arg1_copy;
+        
+        // Copiar num_pares si existe
+        if (argc == 3) {
+            char *arg2_copy = (char *)malloc(strlen(argv[2]) + 1);
+            if (arg2_copy == NULL) {
+                free(arg1_copy);
+                free(process_argv);
+                printf("Error: no se pudo asignar memoria para el proceso.\n");
+                return CMD_ERROR;
+            }
+            idx = 0;
+            while (argv[2][idx] != '\0') {
+                arg2_copy[idx] = argv[2][idx];
+                idx++;
+            }
+            arg2_copy[idx] = '\0';
+            process_argv[1] = arg2_copy;
+            process_argv[2] = NULL;
+        } else {
+            process_argv[1] = NULL;
+        }
+        
+        int64_t pid = my_create_process("test_sync", test_sync_wrapper, process_argv, 0);  // background
+        if (pid <= 0) {
+            free(arg1_copy);
+            if (argc == 3) free(process_argv[1]);
+            free(process_argv);
+            printf("Error: no se pudo crear el proceso test_sync.\n");
+            return CMD_ERROR;
+        }
+        
+        printf("Test de sincronizacion iniciado con PID: %lld (background)\n", pid);
+        return OK;
+    } else {
+        // Ejecutar directamente en foreground
+        /* build argv for test_sync: { repetitions, use_sem, [num_pairs] }
+           use_sem = 1 for synchronized test */
+        char *targv[3];
+        targv[0] = argv[1];
+        targv[1] = "1";
+        if (argc == 3) {
+            targv[2] = argv[2];  // número de pares especificado
+        }
 
-    int64_t res = (int64_t)test_sync(argc == 3 ? 3 : 2, targv);
-    if (res == -1) {
-        printf("test_sync fallo\n");
-        return CMD_ERROR;
+        int64_t res = (int64_t)test_sync(argc == 3 ? 3 : 2, targv);
+        if (res == -1) {
+            printf("test_sync fallo\n");
+            return CMD_ERROR;
+        }
+        return OK;
     }
-    return OK;
 }
 
 int testNoSynchroCmd(int argc, char *argv[]) {
@@ -239,19 +423,60 @@ int testNoSynchroCmd(int argc, char *argv[]) {
 }
 
 int testProcesesCmd(int argc, char *argv[]) {
+    extern int g_run_in_background;
+    
     if (argc != 2) {
-        printf("Uso: testproceses <max_proceses>\n");
+        printf("Uso: testproceses <max_proceses> [&]\n");
         return CMD_ERROR;
     }
 
-    int64_t result = test_processes(argc - 1, argv + 1);
+    // Si se ejecuta en background, crear un proceso
+    if (g_run_in_background) {
+        // Copiar argumentos para el proceso
+        char **process_argv = (char **)malloc(2 * sizeof(char *));
+        if (process_argv == NULL) {
+            printf("Error: no se pudo asignar memoria para el proceso.\n");
+            return CMD_ERROR;
+        }
+        
+        char *arg_copy = (char *)malloc(strlen(argv[1]) + 1);
+        if (arg_copy == NULL) {
+            free(process_argv);
+            printf("Error: no se pudo asignar memoria para el proceso.\n");
+            return CMD_ERROR;
+        }
+        
+        // Copiar manualmente
+        int idx = 0;
+        while (argv[1][idx] != '\0') {
+            arg_copy[idx] = argv[1][idx];
+            idx++;
+        }
+        arg_copy[idx] = '\0';
+        process_argv[0] = arg_copy;
+        process_argv[1] = NULL;
+        
+        int64_t pid = my_create_process("test_processes", test_processes_wrapper, process_argv, 0);  // background
+        if (pid <= 0) {
+            free(arg_copy);
+            free(process_argv);
+            printf("Error: no se pudo crear el proceso test_processes.\n");
+            return CMD_ERROR;
+        }
+        
+        printf("Test de procesos iniciado con PID: %lld (background)\n", pid);
+        return OK;
+    } else {
+        // Ejecutar directamente en foreground
+        int64_t result = test_processes(argc - 1, argv + 1);
 
-    if (result == -1) {
-        printf("testproceses fallo\n");
-        return CMD_ERROR;
+        if (result == -1) {
+            printf("testproceses fallo\n");
+            return CMD_ERROR;
+        }
+
+        return OK;
     }
-
-    return OK;
 }
 
 int gameCmd(int argc, char *argv[]) {
@@ -270,16 +495,58 @@ int mmTypeCmd(int argc, char *argv[]) {
 }
 
 int testPriorityCmd(int argc, char *argv[]) {
+    extern int g_run_in_background;
+    
     if (argc != 2) {
-        printf("Uso: test_priority <max_value>\n");
+        printf("Uso: test_priority <max_value> [&]\n");
         return CMD_ERROR;
     }
-    uint64_t res = test_prio(argc - 1, argv + 1);
-    if ((int64_t)res == -1) {
-        printf("test_priority fallo\n");
-        return CMD_ERROR;
+    
+    // Si se ejecuta en background, crear un proceso
+    if (g_run_in_background) {
+        // Copiar argumentos para el proceso
+        char **process_argv = (char **)malloc(2 * sizeof(char *));
+        if (process_argv == NULL) {
+            printf("Error: no se pudo asignar memoria para el proceso.\n");
+            return CMD_ERROR;
+        }
+        
+        char *arg_copy = (char *)malloc(strlen(argv[1]) + 1);
+        if (arg_copy == NULL) {
+            free(process_argv);
+            printf("Error: no se pudo asignar memoria para el proceso.\n");
+            return CMD_ERROR;
+        }
+        
+        // Copiar manualmente
+        int idx = 0;
+        while (argv[1][idx] != '\0') {
+            arg_copy[idx] = argv[1][idx];
+            idx++;
+        }
+        arg_copy[idx] = '\0';
+        process_argv[0] = arg_copy;
+        process_argv[1] = NULL;
+        
+        int64_t pid = my_create_process("test_prio", test_prio_wrapper, process_argv, 0);  // background
+        if (pid <= 0) {
+            free(arg_copy);
+            free(process_argv);
+            printf("Error: no se pudo crear el proceso test_prio.\n");
+            return CMD_ERROR;
+        }
+        
+        printf("Test de prioridades iniciado con PID: %lld (background)\n", pid);
+        return OK;
+    } else {
+        // Ejecutar directamente en foreground
+        uint64_t res = test_prio(argc - 1, argv + 1);
+        if ((int64_t)res == -1) {
+            printf("test_priority fallo\n");
+            return CMD_ERROR;
+        }
+        return OK;
     }
-    return OK;
 }
 
 static const char *state_to_string(int state) {
@@ -348,8 +615,10 @@ static void loop_process_entry(void *arg) {
 }
 
 int loopCmd(int argc, char *argv[]) {
+    extern int g_run_in_background;
+    
     if (argc != 2) {
-        printf("Uso: loop <segundos>\n");
+        printf("Uso: loop <segundos> [&]\n");
         return CMD_ERROR;
     }
 
@@ -385,7 +654,10 @@ int loopCmd(int argc, char *argv[]) {
     process_argv[0] = seconds_str;  // El número de segundos como string (copiado)
     process_argv[1] = NULL;
 
-    int64_t pid = my_create_process("loop_process", loop_process_entry, process_argv);
+    // Si hay &, ejecutar en background. Si no, en foreground.
+    int is_foreground = g_run_in_background ? 0 : 1;
+    
+    int64_t pid = my_create_process("loop_process", loop_process_entry, process_argv, is_foreground);
     if (pid <= 0) {
         free(seconds_str);
         free(process_argv);
@@ -393,7 +665,14 @@ int loopCmd(int argc, char *argv[]) {
         return CMD_ERROR;
     }
 
-    printf("Proceso loop creado con PID: %lld\n", pid);
+    printf("Proceso loop creado con PID: %lld%s\n", pid, g_run_in_background ? " (background)" : "");
+    
+    // Si NO es background, esperar a que termine el proceso
+    if (!g_run_in_background) {
+        my_wait(pid);
+        printf("\nProceso loop terminado.\n");
+    }
+    
     return OK;
 }
 

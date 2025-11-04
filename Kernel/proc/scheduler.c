@@ -83,9 +83,15 @@ static void save_context(process_t *p, uint64_t current_rsp) {
             process_queue_push(&blocked_q, p);
             break;
         case PROCESS_STATE_FINISHED:
-            // Los waiters ya fueron despertados por scheduler_finish_current()
-            // Solo asegurarnos de que el proceso esté en la cola finished
-            // (process_queue_push maneja duplicados removiendo primero)
+            // Despertar procesos que esperan por este PID
+            while (p->waiters_head) {
+                process_t *w = p->waiters_head;
+                p->waiters_head = w->waiter_next;
+                w->waiter_next = NULL;
+                w->waiting_on_pid = 0;
+                w->state = PROCESS_STATE_READY;
+                ready_queue_push(w);
+            }
             process_queue_push(&finished_q, p);
             break;
         default:
@@ -101,7 +107,7 @@ void init_scheduler(void) {
     process_queue_init(&blocked_q);
     process_queue_init(&finished_q);
 
-    idle_p = process_create("idle", idle_entry, NULL, NULL);
+    idle_p = process_create("idle", idle_entry, NULL, NULL, 0);  // idle no es foreground
     if (idle_p) {
         idle_p->state = PROCESS_STATE_RUNNING;
         current = idle_p;
@@ -165,17 +171,18 @@ void scheduler_add_process(process_t *p) {
     if (!p || p == idle_p) {
         return;
     }
-    //sched_crit_enter();
+    sched_crit_enter();
     p->state = PROCESS_STATE_READY;
     ready_queue_push(p);
-    //sched_crit_exit();
+    sched_crit_exit();
 }
 
 process_t *scheduler_spawn_process(const char *name,
                                    process_entry_point_t entry_point,
                                    void *entry_arg,
-                                   process_t *parent) {
-    process_t *p = process_create(name, entry_point, entry_arg, parent);
+                                   process_t *parent,
+                                   int is_foreground) {
+    process_t *p = process_create(name, entry_point, entry_arg, parent, is_foreground);
     if (!p) {
         return NULL;
     }
@@ -204,46 +211,28 @@ void scheduler_unblock_process(process_t *p) {
     if (!p) {
         return;
     }
-    //sched_crit_enter();
+    sched_crit_enter();
     process_queue_remove(&blocked_q, p);
     p->state = PROCESS_STATE_READY;
     ready_queue_push(p);
     // Si tiene mayor prioridad que el actual, forzar reschedule
     if (current && p->priority > current->priority)
         need_resched = 1;
-    //sched_crit_exit();
+    sched_crit_exit();
 }
 
 void scheduler_finish_current(void) {
     if (!current || current == idle_p) {
         return;
     }
-    
-    // Remover el proceso de las colas de ready antes de marcarlo como FINISHED
-    for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
-        process_queue_remove(&ready_queues[pr], current);
-    }
-    process_queue_remove(&blocked_q, current);
-    
-    // Despertar waiters INMEDIATAMENTE (como hace wakeupWaitingParent en el ejemplo)
-    while (current->waiters_head) {
-        process_t *w = current->waiters_head;
-        current->waiters_head = w->waiter_next;
-        w->waiter_next = NULL;
-        w->waiting_on_pid = 0;
-        w->state = PROCESS_STATE_READY;
-        ready_queue_push(w);
-    }
-    
     current->state = PROCESS_STATE_FINISHED;
-    process_queue_push(&finished_q, current);
     need_resched = 1;
 }
 
 process_t *scheduler_collect_finished(void) {
-    //sched_crit_enter();
+    sched_crit_enter();
     process_t *p = process_queue_pop(&finished_q);
-    //sched_crit_exit();
+    sched_crit_exit();
     return p;
 }
 
@@ -290,7 +279,7 @@ int scheduler_kill_by_pid(uint64_t pid) {
         return 0;
     }
     // marcar terminado y mover a finished
-    //sched_crit_enter();
+    sched_crit_enter();
     p->state = PROCESS_STATE_FINISHED;
     for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
         process_queue_remove(&ready_queues[pr], p);
@@ -306,7 +295,7 @@ int scheduler_kill_by_pid(uint64_t pid) {
         ready_queue_push(w);
     }
     process_queue_push(&finished_q, p);
-    //sched_crit_exit();
+    sched_crit_exit();
     if (p == current)
         need_resched = 1;
     return 1;
@@ -316,11 +305,11 @@ int scheduler_set_priority(uint64_t pid, uint8_t new_priority) {
     process_t *p = scheduler_find_by_pid(pid);
     if (!p || p == idle_p) return 0;
 
-    //sched_crit_enter();
+    sched_crit_enter();
     uint8_t clamped = clamp_priority(new_priority);
     int oldp = p->priority;
     if (oldp == clamped) {
-        //sched_crit_exit();
+        sched_crit_exit();
         return 1;
     }
 
@@ -337,7 +326,7 @@ int scheduler_set_priority(uint64_t pid, uint8_t new_priority) {
     // Si sube sobre el actual, forzar resched
     if (current && p->priority > current->priority)
         need_resched = 1;
-    //sched_crit_exit();
+    sched_crit_exit();
     return 1;
 }
 
@@ -345,12 +334,12 @@ int scheduler_block_by_pid(uint64_t pid) {
     process_t *p = scheduler_find_by_pid(pid);
     if (!p || p == idle_p) return 0;
 
-    //sched_crit_enter();
+    sched_crit_enter();
     if (p == current) {
         // Marcar y que el movimiento ocurra en save_context
         current->state = PROCESS_STATE_BLOCKED;
         need_resched = 1;
-        //sched_crit_exit();
+        sched_crit_exit();
         return 1;
     }
 
@@ -359,10 +348,11 @@ int scheduler_block_by_pid(uint64_t pid) {
         p->state = PROCESS_STATE_BLOCKED;
         process_queue_push(&blocked_q, p);
         need_resched = 1;
-        //sched_crit_exit();
+        sched_crit_exit();
         return 1;
     }
-
+    // Si ya está bloqueado o terminado no hacemos nada
+    sched_crit_exit();
     return 1;
 }
 
@@ -372,15 +362,19 @@ static void add_process_to_list(process_t *p, process_info_t *buffer, uint64_t *
     }
 
     buffer[*count].pid = p->pid;
-    for (int i = 0; i < PROCESS_NAME_MAX_LEN && p->name[i] != '\0'; i++) {
+    
+    // Copiar nombre asegurando terminador nulo
+    int i;
+    for (i = 0; i < PROCESS_NAME_MAX_LEN && p->name[i] != '\0'; i++) {
         buffer[*count].name[i] = p->name[i];
     }
-    buffer[*count].name[PROCESS_NAME_MAX_LEN] = '\0';
+    buffer[*count].name[i] = '\0';  // Asegurar terminador en la posición correcta
+    
     buffer[*count].state = p->state;
     buffer[*count].priority = p->priority;
     buffer[*count].rsp = p->rsp;
     buffer[*count].rbp = p->rbp;
-    buffer[*count].foreground = (p->state == PROCESS_STATE_RUNNING) ? 1 : 0;
+    buffer[*count].foreground = p->is_foreground;  // Usar is_foreground del proceso
     (*count)++;
 }
 
@@ -389,7 +383,7 @@ uint64_t scheduler_list_all_processes(process_info_t *buffer, uint64_t max_count
         return 0;
     }
 
-    //sched_crit_enter();
+    sched_crit_enter();
     uint64_t count = 0;
 
     // Agregar procesos de las colas ready por prioridad
@@ -420,7 +414,7 @@ uint64_t scheduler_list_all_processes(process_info_t *buffer, uint64_t max_count
                 buffer[i].state = current->state;
                 buffer[i].rsp = current->rsp;
                 buffer[i].rbp = current->rbp;
-                buffer[i].foreground = (current->state == PROCESS_STATE_RUNNING) ? 1 : 0;
+                buffer[i].foreground = current->is_foreground;  // Usar is_foreground del proceso
                 break;
             }
         }
@@ -429,6 +423,6 @@ uint64_t scheduler_list_all_processes(process_info_t *buffer, uint64_t max_count
         }
     }
 
-    //sched_crit_exit();
+    sched_crit_exit();
     return count;
 }

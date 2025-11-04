@@ -22,7 +22,8 @@ void process_system_init(void) { next_pid = 1; }
 process_t *process_create(const char *name,
                           process_entry_point_t entry_point,
                           void *entry_arg,
-                          process_t *parent) {
+                          process_t *parent,
+                          int is_foreground) {
     if (!entry_point) return NULL;
 
     process_t *p = (process_t *)mm_alloc(sizeof(process_t));
@@ -43,6 +44,7 @@ process_t *process_create(const char *name,
     p->entry_point = entry_point;
     p->entry_arg   = entry_arg;
     p->state       = PROCESS_STATE_NEW;
+    p->is_foreground = is_foreground;  // Inicializar campo is_foreground
 
     copy_name(p, name);
 

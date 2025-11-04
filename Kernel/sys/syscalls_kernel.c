@@ -31,15 +31,25 @@ uint64_t syscall_read(int fd, char *buffer, int count) {
         return 0;
     }
 
+    // Verificar si el proceso actual está en foreground
+    process_t *current_process = scheduler_current_process();
+    if (current_process && !current_process->is_foreground) {
+        // Proceso en background no puede leer del teclado
+        // Lo bloqueamos automáticamente
+        scheduler_block_by_pid(current_process->pid);
+        // Después de bloquearse y despertar, devolvemos 0 (no hay datos)
+        return 0;
+    }
+
     uint64_t read = 0;
     char c;
 
     while (read < count) {
-    c = keyboard_read_getchar();
-    if (c == 0) break;
-    buffer[read++] = c;
-    if (c == '\n') break; 
-}
+        c = keyboard_read_getchar();
+        if (c == 0) break;
+        buffer[read++] = c;
+        if (c == '\n') break; 
+    }
 
     return read;
 }
@@ -168,12 +178,13 @@ uint64_t syscall_meminfo(uint64_t user_addr, uint64_t unused1, uint64_t unused2,
     return 1;
 }
 
-uint64_t syscall_create_process(char *name, void *function, char *argv[]) {
+uint64_t syscall_create_process(char *name, void *function, char *argv[], int is_foreground) {
     process_t *p = process_create(
         name ? name : "user_process",
         (process_entry_point_t)function,
         (void *)argv,
-        NULL
+        NULL,
+        is_foreground
     );
     if (!p) return 0;
     scheduler_add_process(p);
@@ -209,32 +220,24 @@ uint64_t syscall_set_priority(uint64_t pid, uint64_t newPrio, uint64_t unused2, 
     return (uint64_t)scheduler_set_priority(pid, (uint8_t)newPrio);
 }
 
-uint64_t syscall_wait(uint64_t pid, uint64_t, uint64_t, uint64_t, uint64_t) {
+uint64_t syscall_wait(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
     if ((int64_t)pid <= 0) return 0;
-
     process_t *target = scheduler_find_by_pid(pid);
     if (!target) return 0;
 
-    // Si ya terminó, no bloquees
     if (target->state == PROCESS_STATE_FINISHED) {
         return 1;
     }
 
     process_t *me = scheduler_current_process();
-    if (!me || me == target) return 0;
-
-    // Enlazarme en la lista de waiters del 'target'
+    if (!me || me == target || me == NULL) return 0;
     me->waiting_on_pid = pid;
-    me->waiter_next = target->waiters_head;     // (LIFO; si querés FIFO, usar tail)
+    me->waiter_next = target->waiters_head;
     target->waiters_head = me;
-
-    // BLOQUEAR y FORZAR RESCHEDULE INMEDIATO
     scheduler_block_current();
-    scheduler_yield_current();                  // <- FALTA EN TU CÓDIGO
-
+    scheduler_yield_current();
     return 1;
 }
-
 
 uint64_t syscall_sem_create(int initial) {
     if (initial < 0) return 0;

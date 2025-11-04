@@ -1,7 +1,7 @@
 #ifndef COMMANDS_H
 #define COMMANDS_H
 
-#define MAX_ARGS 3
+#define MAX_ARGS 4
 #define OK 0
 #define ERROR -1
 #define EXIT_CODE 1

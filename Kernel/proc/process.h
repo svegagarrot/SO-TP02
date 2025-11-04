@@ -41,6 +41,7 @@ struct process_control_block {
     process_entry_point_t entry_point;
     void *entry_arg;
     uint64_t waiting_on_pid;
+    int is_foreground;  // 1 si está en foreground, 0 si está en background
 
     process_t *parent;
     process_t *first_child;
@@ -62,7 +63,8 @@ void process_system_init(void);
 process_t * process_create(const char *name,
                            process_entry_point_t entry_point,
                            void *entry_arg,
-                           process_t *parent);
+                           process_t *parent,
+                           int is_foreground);
 
 void process_destroy(process_t *p);
 
