@@ -35,6 +35,10 @@ GLOBAL sys_sem_set
 GLOBAL sys_sem_get
 GLOBAL sys_list_processes
 GLOBAL sys_yield
+GLOBAL sys_pipe_create
+GLOBAL sys_pipe_open
+GLOBAL sys_pipe_close
+GLOBAL sys_pipe_dup
 
 
 sys_read:
@@ -347,6 +351,42 @@ sys_yield:
     push rbp
     mov rbp, rsp
     mov rax, 34
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_pipe_create:
+    push rbp
+    mov rbp, rsp
+    mov rax, 41
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_pipe_open:
+    push rbp
+    mov rbp, rsp
+    mov rax, 42
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_pipe_close:
+    push rbp
+    mov rbp, rsp
+    mov rax, 43
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_pipe_dup:
+    push rbp
+    mov rbp, rsp
+    mov rax, 44
     int 0x80
     mov rsp, rbp
     pop rbp

@@ -39,4 +39,8 @@ uint64_t sys_sem_set(uint64_t sem_id, int newval);
 uint64_t sys_sem_get(uint64_t sem_id);
 uint64_t sys_list_processes(void *buffer, uint64_t max_count);
 uint64_t sys_yield();
+uint64_t sys_pipe_create(void);
+uint64_t sys_pipe_open(uint64_t pipe_id);
+uint64_t sys_pipe_close(uint64_t pipe_id);
+uint64_t sys_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode);
 #endif

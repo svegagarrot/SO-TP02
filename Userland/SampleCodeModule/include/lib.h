@@ -104,4 +104,10 @@ int64_t my_yield();
 int get_type_of_mm(char *buf, int buflen);
 uint64_t list_processes(process_info_t *buffer, uint64_t max_count);
 
+// Pipe functions
+uint64_t pipe_create(void);
+uint64_t pipe_open(uint64_t pipe_id);
+uint64_t pipe_close(uint64_t pipe_id);
+uint64_t pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode);
+
 #endif

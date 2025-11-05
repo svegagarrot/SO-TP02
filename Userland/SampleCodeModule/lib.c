@@ -707,3 +707,32 @@ uint64_t list_processes(process_info_t *buffer, uint64_t max_count) {
     }
     return sys_list_processes(buffer, max_count);
 }
+
+// Pipe functions
+uint64_t pipe_create(void) {
+    return sys_pipe_create();
+}
+
+uint64_t pipe_open(uint64_t pipe_id) {
+    if (pipe_id == 0) {
+        return 0;
+    }
+    return sys_pipe_open(pipe_id);
+}
+
+uint64_t pipe_close(uint64_t pipe_id) {
+    if (pipe_id == 0) {
+        return 0;
+    }
+    return sys_pipe_close(pipe_id);
+}
+
+uint64_t pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode) {
+    if (pipe_id == 0) {
+        return 0;
+    }
+    if (mode != 0 && mode != 1) {
+        return 0;  // mode debe ser 0 (lectura) o 1 (escritura)
+    }
+    return sys_pipe_dup(pipe_id, fd, mode);
+}
