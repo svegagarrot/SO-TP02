@@ -9,8 +9,7 @@
 #define QUANTUM_TICKS 8
 #define MAX_FINISHED_COLLECT 4
 
-// Parámetros de aging para prevenir starvation
-#define AGING_THRESHOLD 32      // Ticks de espera antes de boost
+#define AGING_THRESHOLD 200     // Ticks de espera antes de boost (aumentado para debugging)
 #define AGING_BOOST 1          // Cuánto aumentar la prioridad
 
 // Flag global para forzar reschedule inmediato
@@ -158,6 +157,7 @@ uint64_t schedule(uint64_t current_rsp) {
 
     // Aplicar aging para prevenir starvation
     apply_aging();
+    apply_aging();  
 
     // Preemptivo: chequeo de need_resched y condiciones de cambio
     bool quantum_expired = (now - last_switch_tick) >= QUANTUM_TICKS;
@@ -366,6 +366,7 @@ int scheduler_set_priority(uint64_t pid, uint8_t new_priority) {
 
     p->priority = clamped;
     p->base_priority = clamped;  // También actualizar base_priority
+    p->wait_ticks = 0;  // Resetear aging counter cuando se cambia prioridad manualmente
 
     if (p->state == PROCESS_STATE_READY) {
         ready_queue_push(p);
