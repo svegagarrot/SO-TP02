@@ -43,4 +43,5 @@ uint64_t sys_pipe_create(void);
 uint64_t sys_pipe_open(uint64_t pipe_id);
 uint64_t sys_pipe_close(uint64_t pipe_id);
 uint64_t sys_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode);
+uint64_t sys_get_foreground_pid();
 #endif

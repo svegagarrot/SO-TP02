@@ -31,4 +31,7 @@ int scheduler_set_priority(uint64_t pid, uint8_t new_priority);
 // Función para listar todos los procesos del sistema
 uint64_t scheduler_list_all_processes(process_info_t *buffer, uint64_t max_count);
 
+// Función para obtener el PID del proceso en foreground (o 0 si no hay)
+uint64_t scheduler_get_foreground_pid(void);
+
 #endif

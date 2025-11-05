@@ -40,6 +40,31 @@ void readLine(char *buf, int maxLen) {
 
     while (1) {
         c = getchar();
+        
+        // Ctrl+D (0x04): enviar EOF
+        if (c == 0x04) {
+            // Si la línea está vacía, comportamiento típico de EOF
+            if (len == 0) {
+                printf("\n");
+                buf[0] = '\0';
+                return;
+            }
+            // Si hay contenido, ignorar Ctrl+D
+            continue;
+        }
+        
+        // Ctrl+C (0x03): limpiar línea y empezar de nuevo
+        if (c == 0x03) {
+            // Limpiar la línea actual
+            while (len > 0) {
+                len--;
+                putchar('\b'); putchar(' '); putchar('\b');
+            }
+            buf[0] = '\0';
+            printf("\n");
+            return;
+        }
+        
         if (c == '\n') {
             putchar('\n');
             break;

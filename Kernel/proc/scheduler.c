@@ -116,6 +116,11 @@ static void save_context(process_t *p, uint64_t current_rsp) {
             process_queue_push(&blocked_q, p);
             break;
         case PROCESS_STATE_FINISHED:
+            // Si el proceso terminado tenía foreground, restaurar al padre
+            if (p->is_foreground && p->parent && p->parent->state != PROCESS_STATE_FINISHED) {
+                p->parent->is_foreground = 1;
+            }
+            
             // Despertar procesos que esperan por este PID
             while (p->waiters_head) {
                 process_t *w = p->waiters_head;
@@ -332,6 +337,12 @@ int scheduler_kill_by_pid(uint64_t pid) {
     }
     // marcar terminado y mover a finished
     sched_crit_enter();
+    
+    // Si el proceso tenía foreground, restaurar al padre
+    if (p->is_foreground && p->parent && p->parent->state != PROCESS_STATE_FINISHED) {
+        p->parent->is_foreground = 1;
+    }
+    
     p->state = PROCESS_STATE_FINISHED;
     for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
         process_queue_remove(&ready_queues[pr], p);
@@ -479,4 +490,38 @@ uint64_t scheduler_list_all_processes(process_info_t *buffer, uint64_t max_count
 
     sched_crit_exit();
     return count;
+}
+
+uint64_t scheduler_get_foreground_pid(void) {
+    sched_crit_enter();
+    
+    // Buscar en current primero
+    if (current && current != idle_p && current->is_foreground) {
+        uint64_t pid = current->pid;
+        sched_crit_exit();
+        return pid;
+    }
+    
+    // Buscar en las colas ready
+    for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
+        for (process_t *p = ready_queues[pr].head; p; p = p->queue_next) {
+            if (p->is_foreground) {
+                uint64_t pid = p->pid;
+                sched_crit_exit();
+                return pid;
+            }
+        }
+    }
+    
+    // Buscar en blocked_q
+    for (process_t *p = blocked_q.head; p; p = p->queue_next) {
+        if (p->is_foreground) {
+            uint64_t pid = p->pid;
+            sched_crit_exit();
+            return pid;
+        }
+    }
+    
+    sched_crit_exit();
+    return 0;  // No hay proceso en foreground
 }

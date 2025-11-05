@@ -233,15 +233,28 @@ uint64_t syscall_meminfo(uint64_t user_addr, uint64_t unused1, uint64_t unused2,
 }
 
 uint64_t syscall_create_process(char *name, void *function, char *argv[], uint64_t priority, int is_foreground) {
+    process_t *parent = scheduler_current_process();
+    
+    // Si el proceso hijo va a foreground, el padre debe perder foreground
+    if (is_foreground && parent) {
+        parent->is_foreground = 0;
+    }
+    
     process_t *p = scheduler_spawn_process(
         name ? name : "user_process",
         (process_entry_point_t)function,
         (void *)argv,
-        NULL,
+        parent,  // Pasar el padre para poder restaurar foreground después
         (uint8_t)priority,
         is_foreground
     );
-    if (!p) return 0;
+    if (!p) {
+        // Si falla, restaurar foreground del padre
+        if (is_foreground && parent) {
+            parent->is_foreground = 1;
+        }
+        return 0;
+    }
     return p->pid;
 }
 
@@ -280,16 +293,28 @@ uint64_t syscall_wait(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t
     if (!target) return 0;
 
     if (target->state == PROCESS_STATE_FINISHED) {
+        // Si el hijo estaba en foreground, restaurar foreground del padre
+        process_t *me = scheduler_current_process();
+        if (me && target->is_foreground) {
+            me->is_foreground = 1;
+        }
         return 1;
     }
 
     process_t *me = scheduler_current_process();
     if (!me || me == target || me == NULL) return 0;
+    
     me->waiting_on_pid = pid;
     me->waiter_next = target->waiters_head;
     target->waiters_head = me;
     scheduler_block_current();
     scheduler_yield_current();
+    
+    // Cuando el wait termine, restaurar foreground si el hijo lo tenía
+    if (target->is_foreground) {
+        me->is_foreground = 1;
+    }
+    
     return 1;
 }
 
@@ -396,4 +421,8 @@ uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t
     current_process->fds[fd].pipe = pipe;
     
     return 1;
+}
+
+uint64_t syscall_get_foreground_pid(uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4, uint64_t unused5) {
+    return scheduler_get_foreground_pid();
 }

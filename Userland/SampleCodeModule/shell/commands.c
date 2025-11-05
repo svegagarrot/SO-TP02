@@ -60,7 +60,6 @@ static void test_sync_wrapper(void *arg) {
     char **argv = (char **)arg;
     if (argv != NULL && argv[0] != NULL) {
         // argv[0] = repeticiones, argv[1] = num_pares (puede ser NULL)
-        int argc = (argv[1] != NULL) ? 2 : 1;
         char *args[3];
         args[0] = argv[0];
         args[1] = "1"; // use_sem = 1 para sync
@@ -77,29 +76,137 @@ static void test_sync_wrapper(void *arg) {
     }
 }
 
+// Helper para convertir estado a string
+static const char *state_to_string(int state) {
+    switch (state) {
+        case PROCESS_STATE_NEW: return "NEW";
+        case PROCESS_STATE_READY: return "READY";
+        case PROCESS_STATE_RUNNING: return "RUNNING";
+        case PROCESS_STATE_BLOCKED: return "BLOCKED";
+        case PROCESS_STATE_FINISHED: return "FINISHED";
+        default: return "UNKNOWN";
+    }
+}
+
+// Wrapper para loop que se ejecuta como proceso
+static void loop_process_entry(void *arg) {
+    int seconds = 1;  // Default
+    char **argv = (char **)arg;
+    
+    if (argv != NULL && argv[0] != NULL) {
+        seconds = atoi(argv[0]);
+        if (seconds <= 0) {
+            seconds = 1;  // Fallback a default
+        }
+        // Liberar la memoria del string copiado
+        free(argv[0]);
+        free(argv);
+    }
+    
+    int64_t pid = my_getpid();
+    
+    while (1) {
+        printf("Hola! Soy el proceso con ID %lld\n", pid);
+        sleep(seconds * 1000);  // sleep espera milisegundos
+    }
+}
+
+// Wrapper para ps que se ejecuta como proceso
+static void ps_process_entry(void *arg) {
+    (void)arg;  // No se necesitan argumentos
+    
+    process_info_t processes[MAX_PROCESS_INFO];
+    uint64_t count = list_processes(processes, MAX_PROCESS_INFO);
+
+    if (count == 0) {
+        printf("No hay procesos en el sistema.\n");
+        return;
+    }
+
+    printf("\nPID\tNombre\t\t\tEstado\t\tPrioridad\tRSP\t\t\tRBP\t\t\tForeground\n");
+    printf("---------------------------------------------------------------------------------------------------------------------------\n");
+
+    for (uint64_t i = 0; i < count; i++) {
+        printf("%llu\t", processes[i].pid);
+        printf("%s\t\t", processes[i].name);
+        if (strlen(processes[i].name) < 8) {
+            printf("\t");
+        }
+        printf("%s\t\t", state_to_string(processes[i].state));
+        printf("%d\t\t", processes[i].priority);
+        printf("0x%llx\t", processes[i].rsp);
+        printf("0x%llx\t", processes[i].rbp);
+        printf("%s\n", processes[i].foreground ? "Si" : "No");
+    }
+
+    printf("\nTotal de procesos: %llu\n", count);
+}
+
+// Wrapper para mem que se ejecuta como proceso
+static void mem_process_entry(void *arg) {
+    (void)arg;  // No se necesitan argumentos
+    
+    memory_info_t info;
+    if (memory_info(&info) == 0) {
+        printf("Error: no se pudo obtener la informacion de memoria.\n");
+        return;
+    }
+
+    printf("\n=== Estado de la Memoria ===\n");
+    printf("Total de bytes:       %llu\n", info.total_bytes);
+    printf("Bytes usados:         %llu\n", info.used_bytes);
+    printf("Bytes libres:         %llu\n", info.free_bytes);
+    printf("Bloque libre mas grande: %llu bytes\n", info.largest_free_block);
+    printf("Asignaciones totales: %llu\n", info.allocations);
+    printf("Liberaciones totales: %llu\n", info.frees);
+    printf("Asignaciones fallidas: %llu\n", info.failed_allocations);
+    
+    // Calcular porcentaje de uso
+    if (info.total_bytes > 0) {
+        uint64_t used_percent = (info.used_bytes * 100) / info.total_bytes;
+        uint64_t free_percent = (info.free_bytes * 100) / info.total_bytes;
+        printf("\nPorcentaje de uso:   %llu%%\n", used_percent);
+        printf("Porcentaje libre:    %llu%%\n", free_percent);
+    }
+    
+    printf("\n");
+}
+
+// Wrapper para mmtype que se ejecuta como proceso
+static void mmtype_process_entry(void *arg) {
+    (void)arg;  // No se necesitan argumentos
+    
+    char buf[32] = {0};
+    if (get_type_of_mm(buf, sizeof(buf))) {
+        printf("Memory manager activo: %s\n", buf);
+    } else {
+        printf("No se pudo obtener el tipo de memory manager\n");
+    }
+}
+
 const TShellCmd shellCmds[] = {
-    {"help", helpCmd, ": Muestra los comandos disponibles\n"},
-    {"exit", exitCmd, ": Salir del shell\n"},
-    {"set-user", setUserCmd, ": Setea el nombre de usuario, con un maximo de 10 caracteres\n"},
-    {"clear", clearCmd, ": Limpia la pantalla\n"},
-    {"time", timeCmd, ": Muestra la hora actual\n"},
-    {"font-size", fontSizeCmd, ": Cambia el tamanio de la fuente\n"},
-    {"testmm", testMMCmd, ": Ejecuta el stress test de memoria. Uso: testmm <max_mem>\n"},
-    {"testproceses", testProcesesCmd, ": Ejecuta el stress test de procesos. Uso: testproceses <max_proceses>\n"},
-    {"test_sync", testSyncCmd, ": Ejecuta test sincronizado con semaforos. Uso: test_sync <repeticiones>\n"},
-    {"test_no_synchro", testNoSynchroCmd, ": Ejecuta test sin sincronizacion. Uso: test_no_synchro <repeticiones>\n"},
-    {"test_priority", testPriorityCmd, ": Ejecuta el test de prioridades. Uso: test_priority <max_value>\n"},
-    {"exceptions", exceptionCmd, ": Testear excepciones. Ingrese: exceptions [zero/invalidOpcode] para testear alguna operacion\n"},
-    {"jugar", gameCmd, ": Inicia el modo juego\n"},
-    {"regs", regsCmd, ": Muestra los ultimos 18 registros de la CPU\n"},
-    {"mmtype", mmTypeCmd, ": Muestra el tipo de memory manager activo\n"},
-    {"ps", psCmd, ": Lista todos los procesos con sus propiedades\n"},
-    {"loop", loopCmd, ": Crea un proceso que imprime su ID con saludo cada X segundos. Uso: loop <segundos>\n"},
-    {"kill", killCmd, ": Mata un proceso por PID. Uso: kill <pid>\n"},
-    {"nice", niceCmd, ": Cambia la prioridad de un proceso. Uso: nice <pid> <prioridad>\n"},
-    {"block", blockCmd, ": Cambia el estado de un proceso entre bloqueado y listo. Uso: block <pid>\n"},
-    {"mem", memCmd, ": Imprime el estado de la memoria\n"},
-    {NULL, NULL, NULL}, 
+    {"help", helpCmd, ": Muestra los comandos disponibles\n", 1},               // built-in
+    {"exit", exitCmd, ": Salir del shell\n", 1},                                // built-in
+    {"set-user", setUserCmd, ": Setea el nombre de usuario, con un maximo de 10 caracteres\n", 1},  // built-in
+    {"clear", clearCmd, ": Limpia la pantalla\n", 1},                           // built-in
+    {"time", timeCmd, ": Muestra la hora actual\n", 1},                         // built-in
+    {"font-size", fontSizeCmd, ": Cambia el tamanio de la fuente\n", 1},       // built-in
+    {"testmm", testMMCmd, ": Ejecuta el stress test de memoria. Uso: testmm <max_mem>\n", 0},       // externo
+    {"testproceses", testProcesesCmd, ": Ejecuta el stress test de procesos. Uso: testproceses <max_proceses>\n", 0},  // externo
+    {"test_sync", testSyncCmd, ": Ejecuta test sincronizado con semaforos. Uso: test_sync <repeticiones>\n", 0},  // externo
+    {"test_no_synchro", testNoSynchroCmd, ": Ejecuta test sin sincronizacion. Uso: test_no_synchro <repeticiones>\n", 0},  // externo
+    {"test_priority", testPriorityCmd, ": Ejecuta el test de prioridades. Uso: test_priority <max_value>\n", 0},  // externo
+    {"exceptions", exceptionCmd, ": Testear excepciones. Ingrese: exceptions [zero/invalidOpcode] para testear alguna operacion\n", 1},  // built-in
+    {"jugar", gameCmd, ": Inicia el modo juego\n", 1},                          // built-in
+    {"regs", regsCmd, ": Muestra los ultimos 18 registros de la CPU\n", 1},    // built-in
+    {"mmtype", mmTypeCmd, ": Muestra el tipo de memory manager activo\n", 0},  // externo
+    {"ps", psCmd, ": Lista todos los procesos con sus propiedades\n", 0},       // externo
+    {"loop", loopCmd, ": Crea un proceso que imprime su ID con saludo cada X segundos. Uso: loop <segundos>\n", 0},  // externo
+    {"kill", killCmd, ": Mata un proceso por PID. Uso: kill <pid>\n", 1},      // built-in
+    {"nice", niceCmd, ": Cambia la prioridad de un proceso. Uso: nice <pid> <prioridad>\n", 1},  // built-in
+    {"block", blockCmd, ": Cambia el estado de un proceso entre bloqueado y listo. Uso: block <pid>\n", 1},  // built-in
+    {"mem", memCmd, ": Imprime el estado de la memoria\n", 0},                  // externo
+    {NULL, NULL, NULL, 0}, 
 };
 
 
@@ -206,7 +313,11 @@ int CommandParse(char *commandInput){
             // Pasar información de background a través de una variable global temporal
             extern int g_run_in_background;
             g_run_in_background = is_background;
+            
+            // Para comandos built-in, ejecutar directamente
+            // Para comandos externos, la función del comando debe crear el proceso
             int result = shellCmds[i].function(argc, args);
+            
             g_run_in_background = 0;  // Reset
             return result;
         }
@@ -400,6 +511,8 @@ int testSyncCmd(int argc, char *argv[]) {
 }
 
 int testNoSynchroCmd(int argc, char *argv[]) {
+    // Este comando NO debe correr en background ya que es un test
+    // Siempre lo ejecutamos directamente (foreground implícito)
     if (argc < 2 || argc > 3) {
         printf("Uso: test_no_synchro <repeticiones> [num_pares]\n");
         printf("  repeticiones: número de iteraciones por proceso\n");
@@ -485,12 +598,24 @@ int gameCmd(int argc, char *argv[]) {
 }
 
 int mmTypeCmd(int argc, char *argv[]) {
-    char buf[32] = {0};
-    if (get_type_of_mm(buf, sizeof(buf))) {
-        printf("Memory manager activo: %s\n", buf);
-    } else {
-        printf("No se pudo obtener el tipo de memory manager\n");
+    extern int g_run_in_background;
+    
+    // Siempre crear como proceso separado
+    int is_foreground = g_run_in_background ? 0 : 1;
+    
+    int64_t pid = my_create_process("mmtype", mmtype_process_entry, NULL, 1, is_foreground);
+    if (pid <= 0) {
+        printf("Error: no se pudo crear el proceso mmtype.\n");
+        return CMD_ERROR;
     }
+    
+    if (!g_run_in_background) {
+        // Foreground: esperar a que termine
+        my_wait(pid);
+    } else {
+        printf("Proceso mmtype creado con PID: %lld (background)\n", pid);
+    }
+    
     return OK;
 }
 
@@ -549,69 +674,26 @@ int testPriorityCmd(int argc, char *argv[]) {
     }
 }
 
-static const char *state_to_string(int state) {
-    switch (state) {
-        case PROCESS_STATE_NEW: return "NEW";
-        case PROCESS_STATE_READY: return "READY";
-        case PROCESS_STATE_RUNNING: return "RUNNING";
-        case PROCESS_STATE_BLOCKED: return "BLOCKED";
-        case PROCESS_STATE_FINISHED: return "FINISHED";
-        default: return "UNKNOWN";
-    }
-}
-
 int psCmd(int argc, char *argv[]) {
-    (void)argc;  // No se usan argumentos
-    (void)argv;
-
-    process_info_t processes[MAX_PROCESS_INFO];
-    uint64_t count = list_processes(processes, MAX_PROCESS_INFO);
-
-    if (count == 0) {
-        printf("No hay procesos en el sistema.\n");
-        return OK;
+    extern int g_run_in_background;
+    
+    // Siempre crear como proceso separado
+    int is_foreground = g_run_in_background ? 0 : 1;
+    
+    int64_t pid = my_create_process("ps", ps_process_entry, NULL, 1, is_foreground);
+    if (pid <= 0) {
+        printf("Error: no se pudo crear el proceso ps.\n");
+        return CMD_ERROR;
     }
-
-    printf("\nPID\tNombre\t\t\tEstado\t\tPrioridad\tRSP\t\t\tRBP\t\t\tForeground\n");
-    printf("---------------------------------------------------------------------------------------------------------------------------\n");
-
-    for (uint64_t i = 0; i < count; i++) {
-        printf("%llu\t", processes[i].pid);
-        printf("%s\t\t", processes[i].name);
-        if (strlen(processes[i].name) < 8) {
-            printf("\t");
-        }
-        printf("%s\t\t", state_to_string(processes[i].state));
-        printf("%d\t\t", processes[i].priority);
-        printf("0x%llx\t", processes[i].rsp);
-        printf("0x%llx\t", processes[i].rbp);
-        printf("%s\n", processes[i].foreground ? "Si" : "No");
+    
+    if (!g_run_in_background) {
+        // Foreground: esperar a que termine
+        my_wait(pid);
+    } else {
+        printf("Proceso ps creado con PID: %lld (background)\n", pid);
     }
-
-    printf("\nTotal de procesos: %llu\n", count);
+    
     return OK;
-}
-
-static void loop_process_entry(void *arg) {
-    int seconds = 1;  // Default
-    char **argv = (char **)arg;
-    
-    if (argv != NULL && argv[0] != NULL) {
-        seconds = atoi(argv[0]);
-        if (seconds <= 0) {
-            seconds = 1;  // Fallback a default
-        }
-        // Liberar la memoria del string copiado
-        free(argv[0]);
-        free(argv);
-    }
-    
-    int64_t pid = my_getpid();
-    
-    while (1) {
-        printf("Hola! Soy el proceso con ID %lld\n", pid);
-        sleep(seconds * 1000);  // sleep espera milisegundos
-    }
 }
 
 int loopCmd(int argc, char *argv[]) {
@@ -779,32 +861,23 @@ int blockCmd(int argc, char *argv[]) {
 }
 
 int memCmd(int argc, char *argv[]) {
-    (void)argc;  // No se usan argumentos
-    (void)argv;
-
-    memory_info_t info;
-    if (memory_info(&info) == 0) {
-        printf("Error: no se pudo obtener la informacion de memoria.\n");
+    extern int g_run_in_background;
+    
+    // Siempre crear como proceso separado
+    int is_foreground = g_run_in_background ? 0 : 1;
+    
+    int64_t pid = my_create_process("mem", mem_process_entry, NULL, 1, is_foreground);
+    if (pid <= 0) {
+        printf("Error: no se pudo crear el proceso mem.\n");
         return CMD_ERROR;
     }
-
-    printf("\n=== Estado de la Memoria ===\n");
-    printf("Total de bytes:       %llu\n", info.total_bytes);
-    printf("Bytes usados:         %llu\n", info.used_bytes);
-    printf("Bytes libres:         %llu\n", info.free_bytes);
-    printf("Bloque libre mas grande: %llu bytes\n", info.largest_free_block);
-    printf("Asignaciones totales: %llu\n", info.allocations);
-    printf("Liberaciones totales: %llu\n", info.frees);
-    printf("Asignaciones fallidas: %llu\n", info.failed_allocations);
     
-    // Calcular porcentaje de uso
-    if (info.total_bytes > 0) {
-        uint64_t used_percent = (info.used_bytes * 100) / info.total_bytes;
-        uint64_t free_percent = (info.free_bytes * 100) / info.total_bytes;
-        printf("\nPorcentaje de uso:   %llu%%\n", used_percent);
-        printf("Porcentaje libre:    %llu%%\n", free_percent);
+    if (!g_run_in_background) {
+        // Foreground: esperar a que termine
+        my_wait(pid);
+    } else {
+        printf("Proceso mem creado con PID: %lld (background)\n", pid);
     }
     
-    printf("\n");
     return OK;
 }

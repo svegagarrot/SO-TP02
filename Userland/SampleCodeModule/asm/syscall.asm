@@ -39,6 +39,7 @@ GLOBAL sys_pipe_create
 GLOBAL sys_pipe_open
 GLOBAL sys_pipe_close
 GLOBAL sys_pipe_dup
+GLOBAL sys_get_foreground_pid
 
 
 sys_read:
@@ -359,7 +360,7 @@ sys_yield:
 sys_pipe_create:
     push rbp
     mov rbp, rsp
-    mov rax, 41
+    mov rax, 35
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -368,7 +369,7 @@ sys_pipe_create:
 sys_pipe_open:
     push rbp
     mov rbp, rsp
-    mov rax, 42
+    mov rax, 36
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -377,7 +378,7 @@ sys_pipe_open:
 sys_pipe_close:
     push rbp
     mov rbp, rsp
-    mov rax, 43
+    mov rax, 37
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -386,7 +387,16 @@ sys_pipe_close:
 sys_pipe_dup:
     push rbp
     mov rbp, rsp
-    mov rax, 44
+    mov rax, 38
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_get_foreground_pid:
+    push rbp
+    mov rbp, rsp
+    mov rax, 39
     int 0x80
     mov rsp, rbp
     pop rbp

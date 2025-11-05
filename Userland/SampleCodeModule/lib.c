@@ -734,3 +734,7 @@ uint64_t pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode) {
     }
     return sys_pipe_dup(pipe_id, fd, mode);
 }
+
+uint64_t get_foreground_pid(void) {
+    return sys_get_foreground_pid();
+}

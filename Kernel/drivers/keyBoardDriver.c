@@ -2,6 +2,7 @@
 #include "keystate.h"
 #include <naiveConsole.h>
 #include "semaphore.h"
+#include "scheduler.h"
 
 static int buffer_empty();
 static int buffer_full();
@@ -59,6 +60,21 @@ void keyboard_interrupt_handler() {
 
     if (activeCtrl && (cAscii == 'r' || cAscii == 'R')) {
         request_snapshot();
+    } else if (activeCtrl && (cAscii == 'c' || cAscii == 'C')) {
+        // Ctrl+C: matar proceso en foreground inmediatamente
+        uint64_t fg_pid = scheduler_get_foreground_pid();
+        if (fg_pid != 0) {
+            // Imprimir ^C en consola
+            ncPrint("^C\n");
+            scheduler_kill_by_pid(fg_pid);
+        }
+    } else if (activeCtrl && (cAscii == 'd' || cAscii == 'D')) {
+        // Ctrl+D: enviar carácter especial 0x04 para EOF
+        if (buffer_push(0x04)) {
+            if (kbd_sem_id != 0) {
+                sem_signal_by_id(kbd_sem_id);
+            }
+        }
     } else if (cAscii != 0) {
         if (buffer_push(cAscii)) {
             if (kbd_sem_id != 0) {

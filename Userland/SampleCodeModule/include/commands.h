@@ -13,6 +13,7 @@ typedef struct{
     const char *name;
     cmd_fn function;
     const char *help;
+    int is_builtin;  // 1 = built-in (no crear proceso), 0 = externo (crear proceso)
 }TShellCmd;
 
 extern const TShellCmd shellCmds[];
