@@ -510,7 +510,8 @@ void video_clearScreenColor(uint32_t color) {
 }
 
 int try_getchar(char *c) {
-    return sys_read(0, c, 1);
+    (void)c;
+    return 0;
 }
 
 void sleep(int ms) {
@@ -526,9 +527,6 @@ void beep(int frequency, int duration) {
 }
 
 void clear_key_buffer() {
-    char c;
-    while (try_getchar(&c)) {
-    }
 }
 
 char *toLower(char *str) {

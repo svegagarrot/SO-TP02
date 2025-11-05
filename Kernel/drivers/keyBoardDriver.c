@@ -1,6 +1,7 @@
 #include "keyboardDriver.h"
 #include "keystate.h"
 #include <naiveConsole.h>
+#include "semaphore.h"
 
 static int buffer_empty();
 static int buffer_full();
@@ -26,6 +27,7 @@ typedef struct CircleBuffer{
 
 
 static TCircleBuffer buffer = {.readIndex = 0, .writeIndex = 0, .size = 0};
+static uint64_t kbd_sem_id = 0;
 
 // En primer indice char sin shift, en segundo indice char con shift
 static const char scancode_table[KEY_COUNT][2] = {
@@ -58,7 +60,11 @@ void keyboard_interrupt_handler() {
     if (activeCtrl && (cAscii == 'r' || cAscii == 'R')) {
         request_snapshot();
     } else if (cAscii != 0) {
-        buffer_push(cAscii);
+        if (buffer_push(cAscii)) {
+            if (kbd_sem_id != 0) {
+                sem_signal_by_id(kbd_sem_id);
+            }
+        }
     }
 }
 
@@ -111,6 +117,20 @@ static int buffer_empty() {
 
 char keyboard_read_getchar() {
     return buffer_pop();
+}
+
+void keyboard_init(void) {
+    if (kbd_sem_id == 0) {
+        kbd_sem_id = sem_alloc(0);
+    }
+}
+
+void keyboard_wait_for_char(void) {
+    while (buffer_empty()) {
+        if (kbd_sem_id != 0) {
+            sem_wait_by_id(kbd_sem_id);
+        }
+    }
 }
 
 static char scToAscii(uint8_t scancode) {

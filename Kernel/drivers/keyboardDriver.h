@@ -51,5 +51,11 @@ void keyboard_interrupt_handler();
 */
 char keyboard_read_getchar();
 
+/* Inicializa el subsistema de teclado (semáforos, buffers, etc.) */
+void keyboard_init(void);
+
+/* Bloquea hasta que haya al menos un carácter disponible en el buffer */
+void keyboard_wait_for_char(void);
+
 
 #endif 

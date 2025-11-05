@@ -57,15 +57,15 @@ uint64_t syscall_read(int fd, char *buffer, int count) {
         }
 
         uint64_t read = 0;
-        char c;
-
-        while (read < count) {
-            c = keyboard_read_getchar();
-            if (c == 0) break;
+        while (read < (uint64_t)count) {
+            char c = keyboard_read_getchar();
+            if (c == 0) {
+                keyboard_wait_for_char();
+                continue;
+            }
             buffer[read++] = c;
-            if (c == '\n') break; 
+            if (c == '\n') break;
         }
-
         return read;
     }
     else if (fd_entry->type == FD_TYPE_PIPE_READ) {
