@@ -291,7 +291,7 @@ int testMMCmd(int argc, char *argv[]) {
         process_argv[1] = NULL;
         
         // Usar el wrapper en lugar de test_mm directamente
-        int64_t pid = my_create_process("test_mm", test_mm_process_wrapper, process_argv, 0);  // background
+        int64_t pid = my_create_process("test_mm", test_mm_process_wrapper, process_argv, 1, 0);  // background
         if (pid <= 0) {
             free(arg_copy);
             free(process_argv);
@@ -368,7 +368,7 @@ int testSyncCmd(int argc, char *argv[]) {
             process_argv[1] = NULL;
         }
         
-        int64_t pid = my_create_process("test_sync", test_sync_wrapper, process_argv, 0);  // background
+        int64_t pid = my_create_process("test_sync", test_sync_wrapper, process_argv, 1, 0);  // background
         if (pid <= 0) {
             free(arg1_copy);
             if (argc == 3) free(process_argv[1]);
@@ -456,7 +456,7 @@ int testProcesesCmd(int argc, char *argv[]) {
         process_argv[0] = arg_copy;
         process_argv[1] = NULL;
         
-        int64_t pid = my_create_process("test_processes", test_processes_wrapper, process_argv, 0);  // background
+        int64_t pid = my_create_process("test_processes", test_processes_wrapper, process_argv, 1, 0);  // background
         if (pid <= 0) {
             free(arg_copy);
             free(process_argv);
@@ -528,7 +528,7 @@ int testPriorityCmd(int argc, char *argv[]) {
         process_argv[0] = arg_copy;
         process_argv[1] = NULL;
         
-        int64_t pid = my_create_process("test_prio", test_prio_wrapper, process_argv, 0);  // background
+        int64_t pid = my_create_process("test_prio", test_prio_wrapper, process_argv, 1, 0);  // background
         if (pid <= 0) {
             free(arg_copy);
             free(process_argv);
@@ -657,7 +657,7 @@ int loopCmd(int argc, char *argv[]) {
     // Si hay &, ejecutar en background. Si no, en foreground.
     int is_foreground = g_run_in_background ? 0 : 1;
     
-    int64_t pid = my_create_process("loop_process", loop_process_entry, process_argv, is_foreground);
+    int64_t pid = my_create_process("loop_process", loop_process_entry, process_argv, 1, is_foreground);
     if (pid <= 0) {
         free(seconds_str);
         free(process_argv);

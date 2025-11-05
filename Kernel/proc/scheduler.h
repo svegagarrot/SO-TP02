@@ -13,6 +13,7 @@ process_t *scheduler_spawn_process(const char *name,
                                    process_entry_point_t entry_point,
                                    void *entry_arg,
                                    process_t *parent,
+                                   uint8_t priority,
                                    int is_foreground);
 
 void scheduler_block_current(void);

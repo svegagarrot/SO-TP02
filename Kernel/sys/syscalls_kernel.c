@@ -232,16 +232,16 @@ uint64_t syscall_meminfo(uint64_t user_addr, uint64_t unused1, uint64_t unused2,
     return 1;
 }
 
-uint64_t syscall_create_process(char *name, void *function, char *argv[], int is_foreground) {
-    process_t *p = process_create(
+uint64_t syscall_create_process(char *name, void *function, char *argv[], uint64_t priority, int is_foreground) {
+    process_t *p = scheduler_spawn_process(
         name ? name : "user_process",
         (process_entry_point_t)function,
         (void *)argv,
         NULL,
+        (uint8_t)priority,
         is_foreground
     );
     if (!p) return 0;
-    scheduler_add_process(p);
     return p->pid;
 }
 

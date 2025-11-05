@@ -24,7 +24,7 @@ uint64_t syscall_free(uint64_t address, uint64_t unused1, uint64_t unused2, uint
 uint64_t syscall_meminfo(uint64_t user_addr, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4);
 uint64_t syscall_get_screen_dimensions(uint64_t *width, uint64_t *height);
 extern void outw(uint16_t port, uint16_t value);
-uint64_t syscall_create_process(char *name, void *function, char *argv[], int is_foreground);
+uint64_t syscall_create_process(char *name, void *function, char *argv[], uint64_t priority, int is_foreground);
 uint64_t syscall_kill(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4);
 uint64_t syscall_block(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4);
 uint64_t syscall_unblock(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4);

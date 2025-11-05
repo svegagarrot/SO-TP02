@@ -93,7 +93,7 @@ int main()
 
 	//scheduler_spawn_process("A", procA, NULL, NULL, 0);
 	//scheduler_spawn_process("B", procB, NULL, NULL, 0);
-	scheduler_spawn_process("shell", (void*)sampleCodeModuleAddress, NULL, NULL, 1);  // shell en foreground
+	scheduler_spawn_process("shell", (void*)sampleCodeModuleAddress, NULL, NULL, 2, 1);  // shell en foreground con prioridad alta
 
     load_idt();
 	_sti();

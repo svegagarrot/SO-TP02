@@ -583,7 +583,7 @@ static void *resolve_function_by_name(const char *name) {
     return NULL;
 }
 
-int64_t my_create_process(char *name, void *function, char *argv[], int is_foreground) {
+int64_t my_create_process(char *name, void *function, char *argv[], uint64_t priority, int is_foreground) {
     // Some tests pass a small integer (argc) instead of NULL as the function
     // argument (e.g. my_create_process("my_process_inc", 3, argv); ). Treat
     // small integers as sentinel values and resolve the function by name.
@@ -593,7 +593,7 @@ int64_t my_create_process(char *name, void *function, char *argv[], int is_foreg
             return -1; // No se pudo resolver
         }
     }
-    return sys_create_process(name, function, argv, is_foreground);
+    return sys_create_process(name, function, argv, priority, is_foreground);
 }
 
 int64_t my_kill(uint64_t pid) {

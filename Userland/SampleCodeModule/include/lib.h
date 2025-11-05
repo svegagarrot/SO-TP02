@@ -89,7 +89,7 @@ void clear_key_buffer();
 char *toLower(char *str);
 void shutdown();
 int getScreenDims(uint64_t *width, uint64_t *height);
-int64_t my_create_process(char *name, void *function, char *argv[], int is_foreground);
+int64_t my_create_process(char *name, void *function, char *argv[], uint64_t priority, int is_foreground);
 int64_t my_kill(uint64_t pid);
 int64_t my_block(uint64_t pid);
 int64_t my_unblock(uint64_t pid);

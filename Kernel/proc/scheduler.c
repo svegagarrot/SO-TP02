@@ -227,11 +227,17 @@ process_t *scheduler_spawn_process(const char *name,
                                    process_entry_point_t entry_point,
                                    void *entry_arg,
                                    process_t *parent,
+                                   uint8_t priority,
                                    int is_foreground) {
     process_t *p = process_create(name, entry_point, entry_arg, parent, is_foreground);
     if (!p) {
         return NULL;
     }
+    // Aplicar prioridad solicitada
+    uint8_t pr = clamp_priority(priority);
+    p->priority = pr;
+    p->base_priority = pr;
+    p->wait_ticks = 0;
     scheduler_add_process(p);
     return p;
 }
