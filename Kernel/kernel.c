@@ -10,6 +10,7 @@
 #include <idtLoader.h>
 #include "process.h"
 #include "interrupts.h"
+#include "pipe.h"
 
 extern uint8_t text;
 extern uint8_t rodata;
@@ -87,6 +88,7 @@ int main()
 	_cli();
 	mm_init_default();
 	init_scheduler();
+	pipe_system_init();
 
 	//scheduler_spawn_process("A", procA, NULL, NULL, 0);
 	//scheduler_spawn_process("B", procB, NULL, NULL, 0);

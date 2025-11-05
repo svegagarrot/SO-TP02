@@ -1,6 +1,7 @@
 #include "process.h"
 #include "mm.h"
 #include "interrupts.h"
+#include "pipe.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -59,6 +60,14 @@ process_t *process_create(const char *name,
     p->queue_next = NULL;
     p->queue_prev = NULL;
 
+    // Inicializar tabla de file descriptors
+    // STDIN (fd 0) y STDOUT (fd 1) apuntan a terminal por defecto
+    for (int i = 0; i < MAX_FDS; i++) {
+        p->fds[i].type = FD_TYPE_TERMINAL;
+        p->fds[i].pipe = NULL;
+    }
+    // Los primeros dos FDs ya están correctos (FD_TYPE_TERMINAL)
+
     if (parent) {
         p->parent       = parent;
         p->next_sibling = parent->first_child;
@@ -78,6 +87,22 @@ process_t *process_create(const char *name,
 
 void process_destroy(process_t *p) {
     if (!p) return;
+
+    // Cerrar todos los file descriptors que sean pipes
+    for (int i = 0; i < MAX_FDS; i++) {
+        if (p->fds[i].type == FD_TYPE_PIPE_READ || p->fds[i].type == FD_TYPE_PIPE_WRITE) {
+            if (p->fds[i].pipe) {
+                // Obtener el ID del pipe para cerrarlo
+                uint64_t pipe_id = pipe_get_id(p->fds[i].pipe);
+                if (pipe_id != 0) {
+                    pipe_close_by_id(pipe_id);
+                }
+            }
+            // Limpiar la entrada
+            p->fds[i].type = FD_TYPE_TERMINAL;
+            p->fds[i].pipe = NULL;
+        }
+    }
 
     if (p->parent) {
         if (p->prev_sibling) p->prev_sibling->next_sibling = p->next_sibling;

@@ -13,6 +13,7 @@
 #include "mm.h"
 #include <string.h>
 #include "semaphore.h"
+#include "pipe.h"
 
 #define STDIN 0
 #define STDOUT 1
@@ -27,44 +28,97 @@ uint64_t syscall_get_regs(uint64_t *dest) {
 }
 
 uint64_t syscall_read(int fd, char *buffer, int count) {
-    if (fd != STDIN || buffer == NULL || count <= 0){
+    if (buffer == NULL || count <= 0 || fd < 0 || fd >= MAX_FDS) {
         return 0;
     }
 
-    // Verificar si el proceso actual está en foreground
     process_t *current_process = scheduler_current_process();
-    if (current_process && !current_process->is_foreground) {
-        // Proceso en background no puede leer del teclado
-        // Lo bloqueamos automáticamente
-        scheduler_block_by_pid(current_process->pid);
-        // Después de bloquearse y despertar, devolvemos 0 (no hay datos)
+    if (!current_process) {
         return 0;
     }
 
-    uint64_t read = 0;
-    char c;
+    // Consultar tabla de file descriptors
+    fd_entry_t *fd_entry = &current_process->fds[fd];
+    
+    // Leer según el tipo de FD
+    if (fd_entry->type == FD_TYPE_TERMINAL) {
+        // Leer de terminal (STDIN)
+        if (fd != STDIN) {
+            return 0;  // Solo FD 0 puede leer de terminal
+        }
 
-    while (read < count) {
-        c = keyboard_read_getchar();
-        if (c == 0) break;
-        buffer[read++] = c;
-        if (c == '\n') break; 
+        // Verificar si el proceso actual está en foreground
+        if (!current_process->is_foreground) {
+            // Proceso en background no puede leer del teclado
+            // Lo bloqueamos automáticamente
+            scheduler_block_by_pid(current_process->pid);
+            // Después de bloquearse y despertar, devolvemos 0 (no hay datos)
+            return 0;
+        }
+
+        uint64_t read = 0;
+        char c;
+
+        while (read < count) {
+            c = keyboard_read_getchar();
+            if (c == 0) break;
+            buffer[read++] = c;
+            if (c == '\n') break; 
+        }
+
+        return read;
     }
-
-    return read;
+    else if (fd_entry->type == FD_TYPE_PIPE_READ) {
+        // Leer de pipe
+        if (!fd_entry->pipe) {
+            return 0;
+        }
+        return pipe_read(fd_entry->pipe, buffer, count);
+    }
+    else {
+        // FD_TYPE_PIPE_WRITE: no se puede leer de un pipe de escritura
+        return 0;
+    }
 }
 
 
 uint64_t syscall_write(int fd, const char * buffer, int count) {
-    if (fd != STDOUT) {
+    if (buffer == NULL || count <= 0 || fd < 0 || fd >= MAX_FDS) {
         return 0;
     }
-    
-    for (int i = 0; i < count; i++) {
-        video_putChar(buffer[i], FOREGROUND_COLOR, BACKGROUND_COLOR);
+
+    process_t *current_process = scheduler_current_process();
+    if (!current_process) {
+        return 0;
     }
+
+    // Consultar tabla de file descriptors
+    fd_entry_t *fd_entry = &current_process->fds[fd];
     
-    return count;
+    // Escribir según el tipo de FD
+    if (fd_entry->type == FD_TYPE_TERMINAL) {
+        // Escribir a terminal (STDOUT)
+        if (fd != STDOUT) {
+            return 0;  // Solo FD 1 puede escribir a terminal
+        }
+        
+        for (int i = 0; i < count; i++) {
+            video_putChar(buffer[i], FOREGROUND_COLOR, BACKGROUND_COLOR);
+        }
+        
+        return count;
+    }
+    else if (fd_entry->type == FD_TYPE_PIPE_WRITE) {
+        // Escribir a pipe
+        if (!fd_entry->pipe) {
+            return 0;
+        }
+        return pipe_write(fd_entry->pipe, buffer, count);
+    }
+    else {
+        // FD_TYPE_PIPE_READ: no se puede escribir a un pipe de lectura
+        return 0;
+    }
 }
 
 
@@ -285,5 +339,61 @@ uint64_t syscall_yield(uint64_t unused1, uint64_t unused2, uint64_t unused3, uin
         return 0;
     }
     scheduler_yield_current();
+    return 1;
+}
+
+// Syscalls de pipes
+uint64_t syscall_pipe_create(uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4, uint64_t unused5) {
+    return pipe_create();
+}
+
+uint64_t syscall_pipe_open(uint64_t pipe_id, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    return pipe_open_by_id(pipe_id);
+}
+
+uint64_t syscall_pipe_close(uint64_t pipe_id, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    return pipe_close_by_id(pipe_id);
+}
+
+// Asignar un pipe a un file descriptor específico
+// pipe_id: ID del pipe a asignar
+// fd: file descriptor donde asignar el pipe
+// mode: 0 para lectura, 1 para escritura
+uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t unused1, uint64_t unused2) {
+    if (fd < 0 || fd >= MAX_FDS) {
+        return 0;
+    }
+    
+    process_t *current_process = scheduler_current_process();
+    if (!current_process) {
+        return 0;
+    }
+    
+    // Obtener el pipe
+    pipe_t *pipe = pipe_get_by_id(pipe_id);
+    if (!pipe) {
+        return 0;
+    }
+    
+    // Abrir el pipe (incrementar refcount)
+    if (!pipe_open_by_id(pipe_id)) {
+        return 0;
+    }
+    
+    // Asignar el pipe al FD
+    if (mode == 0) {
+        // Modo lectura
+        current_process->fds[fd].type = FD_TYPE_PIPE_READ;
+    } else if (mode == 1) {
+        // Modo escritura
+        current_process->fds[fd].type = FD_TYPE_PIPE_WRITE;
+    } else {
+        // Modo inválido, cerrar el pipe que abrimos
+        pipe_close_by_id(pipe_id);
+        return 0;
+    }
+    
+    current_process->fds[fd].pipe = pipe;
+    
     return 1;
 }

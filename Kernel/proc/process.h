@@ -12,8 +12,26 @@
 #define PROCESS_PRIORITY_MAX      2
 #define PROCESS_PRIORITY_DEFAULT  1
 
+#define MAX_FDS 16  // Número máximo de file descriptors por proceso
+
 typedef struct process_control_block process_t;
 typedef void (*process_entry_point_t)(void *);
+
+// Forward declaration para evitar dependencia circular
+typedef struct pipe_t pipe_t;
+
+typedef enum {
+    FD_TYPE_TERMINAL = 0,
+    FD_TYPE_PIPE_READ = 1,
+    FD_TYPE_PIPE_WRITE = 2
+} fd_type_t;
+
+typedef struct {
+    fd_type_t type;
+    union {
+        pipe_t *pipe;  // NULL si es terminal
+    };
+} fd_entry_t;
 
 typedef enum {
     PROCESS_STATE_NEW = 0,
@@ -58,6 +76,9 @@ struct process_control_block {
         uint64_t waiting_on_sem;
         /* Next pointer when enqueued on a semaphore wait queue */
         process_t *sem_waiter_next;
+    
+    /* File descriptors table */
+    fd_entry_t fds[MAX_FDS];
 };
 
 void process_system_init(void);
