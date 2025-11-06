@@ -187,6 +187,7 @@ int pipe_read(pipe_t *p, char *buffer, size_t count) {
         // Verificar si los escritores cerraron y no hay datos
         if (p->count == 0 && p->writers_closed) {
             sem_signal_by_id(p->mutex_id);
+            sem_signal_by_id(p->sem_readers_id);  // Devolver el signal del semáforo
             // Si ya leímos algo, retornar lo que leímos
             // Si no leímos nada, esto es EOF
             break;
@@ -230,16 +231,25 @@ int pipe_write(pipe_t *p, const char *buffer, size_t count) {
         }
 
         if (!sem_wait_by_id(p->mutex_id)) {
+            sem_signal_by_id(p->sem_writers_id);  // Devolver el signal del semáforo
             break;
         }
 
-        p->buffer[p->write_pos] = buffer[bytes_written];
-        p->write_pos = (p->write_pos + 1) % PIPE_BUFFER_SIZE;
-        p->count++;
-        bytes_written++;
+        // Verificar que realmente hay espacio disponible
+        if (p->count < PIPE_BUFFER_SIZE) {
+            p->buffer[p->write_pos] = buffer[bytes_written];
+            p->write_pos = (p->write_pos + 1) % PIPE_BUFFER_SIZE;
+            p->count++;
+            bytes_written++;
 
-        sem_signal_by_id(p->mutex_id);
-        sem_signal_by_id(p->sem_readers_id);
+            sem_signal_by_id(p->mutex_id);
+            sem_signal_by_id(p->sem_readers_id);
+        } else {
+            // No debería pasar si los semáforos están bien sincronizados
+            sem_signal_by_id(p->mutex_id);
+            sem_signal_by_id(p->sem_writers_id);  // Devolver el signal
+            break;
+        }
     }
     
     return (int)bytes_written;
