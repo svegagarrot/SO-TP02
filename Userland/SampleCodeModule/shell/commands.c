@@ -181,6 +181,25 @@ static void wc_process_entry(void *arg) {
     printf("%d\n", line_count);
 }
 
+// Wrapper para filter que filtra vocales del input
+static void filter_process_entry(void *arg) {
+    (void)arg;  // No se necesitan argumentos
+    
+    char buffer[256];
+    int n;
+    
+    while ((n = sys_read(STDIN_FD, buffer, sizeof(buffer))) > 0) {
+        for (int i = 0; i < n; i++) {
+            char c = buffer[i];
+            // Filtrar vocales (mayúsculas y minúsculas)
+            if (c != 'a' && c != 'e' && c != 'i' && c != 'o' && c != 'u' &&
+                c != 'A' && c != 'E' && c != 'I' && c != 'O' && c != 'U') {
+                printf("%c", c);
+            }
+        }
+    }
+}
+
 // Wrapper para echo que imprime sus argumentos
 static void echo_process_entry(void *arg) {
     char **argv = (char **)arg;
@@ -269,6 +288,7 @@ const TShellCmd shellCmds[] = {
     {"cat", catCmd, ": Imprime el stdin tal como lo recibe\n", 0},             // externo
     {"wc", wcCmd, ": Cuenta la cantidad de lineas del input\n", 0},            // externo
     {"echo", echoCmd, ": Imprime argumentos. Uso: echo <texto>\n", 0},         // externo
+    {"filter", filterCmd, ": Filtra las vocales del input\n", 0},              // externo
     {NULL, NULL, NULL, 0}, 
 };
 
@@ -1190,6 +1210,27 @@ int echoCmd(int argc, char *argv[]) {
         return CMD_ERROR;
     }
     
+    if (!g_run_in_background) {
+        my_wait(pid);
+    }
+    
+    return OK;
+}
+
+// filter: Filtra las vocales del input
+int filterCmd(int argc, char *argv[]) {
+    extern int g_run_in_background;
+    
+    // Siempre crear como proceso separado
+    int is_foreground = g_run_in_background ? 0 : 1;
+    
+    int64_t pid = my_create_process("filter", filter_process_entry, NULL, 1, is_foreground);
+    if (pid <= 0) {
+        printf("Error: no se pudo crear el proceso filter.\n");
+        return CMD_ERROR;
+    }
+    
+    // Solo esperar y mostrar mensaje si NO estamos en background (no en pipe)
     if (!g_run_in_background) {
         my_wait(pid);
     }
