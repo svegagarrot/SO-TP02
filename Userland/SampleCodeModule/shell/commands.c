@@ -489,9 +489,8 @@ cleanup:
         pipe_release_fd(STDIN_FD);
     }
 
-    if (pipe_id != 0) {
-        pipe_close(pipe_id);
-    }
+    // No cerramos el pipe aquí porque los procesos hijos tienen sus propias referencias.
+    // El pipe se destruirá automáticamente cuando ambos procesos terminen y cierren sus FDs.
     g_run_in_background = original_background;
 
     if (left_pid > 0 && status == CMD_ERROR) {

@@ -3,6 +3,7 @@
     "files.associations": {
         "compare": "cpp",
         "cstdint": "cpp",
-        "format": "cpp"
+        "format": "cpp",
+        "pipe.h": "c"
     }
 }

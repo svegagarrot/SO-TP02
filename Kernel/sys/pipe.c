@@ -120,6 +120,49 @@ int pipe_open_by_id(uint64_t id) {
     return 1;
 }
 
+// Función para liberar una referencia sin marcar writers_closed
+// Solo debe usarse cuando se libera un file descriptor, no cuando se cierra explícitamente
+int pipe_release_ref(uint64_t id) {
+    pipe_t *p = pipe_get_by_id(id);
+    if (!p) return 0;
+    
+    // Decrementar refcount (usar mutex para proteger)
+    sem_wait_by_id(p->mutex_id);
+    p->refcount--;
+    int ref = p->refcount;
+    
+    if (ref <= 0) {
+        // Guardar IDs de semáforos antes de cerrarlos
+        uint64_t readers_id = p->sem_readers_id;
+        uint64_t writers_id = p->sem_writers_id;
+        uint64_t mutex_id = p->mutex_id;
+        
+        // Marcar como no usado antes de liberar el mutex
+        p->used = 0;
+        p->id = 0;
+        p->sem_readers_id = 0;
+        p->sem_writers_id = 0;
+        p->mutex_id = 0;
+        p->read_pos = 0;
+        p->write_pos = 0;
+        p->count = 0;
+        
+        // Liberar mutex (ya no lo necesitamos)
+        sem_signal_by_id(mutex_id);
+        
+        // Cerrar semáforos (después de liberar el mutex)
+        sem_close_by_id(readers_id);
+        sem_close_by_id(writers_id);
+        sem_close_by_id(mutex_id);
+    } else {
+        // Todavía hay referencias, solo liberar el mutex
+        // NO marcar writers_closed porque otros procesos pueden estar usando el pipe
+        sem_signal_by_id(p->mutex_id);
+    }
+    
+    return 1;
+}
+
 int pipe_close_by_id(uint64_t id) {
     pipe_t *p = pipe_get_by_id(id);
     if (!p) return 0;

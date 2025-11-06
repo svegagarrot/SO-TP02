@@ -451,7 +451,9 @@ uint64_t syscall_pipe_release_fd(uint64_t fd, uint64_t unused1, uint64_t unused2
         if (entry->pipe) {
             uint64_t pipe_id = pipe_get_id(entry->pipe);
             if (pipe_id != 0) {
-                pipe_close_by_id(pipe_id);
+                // Usar pipe_release_ref en lugar de pipe_close_by_id
+                // para evitar cerrar el pipe si otros procesos lo usan
+                pipe_release_ref(pipe_id);
             }
         }
     }
