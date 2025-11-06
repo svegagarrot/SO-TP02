@@ -377,7 +377,38 @@ uint64_t syscall_pipe_open(uint64_t pipe_id, uint64_t unused1, uint64_t unused2,
 }
 
 uint64_t syscall_pipe_close(uint64_t pipe_id, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
-    return pipe_close_by_id(pipe_id);
+    if (pipe_id == 0) {
+        return 0;
+    }
+    
+    process_t *current_process = scheduler_current_process();
+    if (!current_process) {
+        return 0;
+    }
+    
+    // Buscar el pipe en la tabla de FDs del proceso para determinar el tipo
+    int is_writer = 0;  // Por defecto asumimos lector
+    int found = 0;
+    
+    for (int i = 0; i < MAX_FDS; i++) {
+        fd_entry_t *entry = &current_process->fds[i];
+        if ((entry->type == FD_TYPE_PIPE_READ || entry->type == FD_TYPE_PIPE_WRITE) && entry->pipe) {
+            uint64_t entry_pipe_id = pipe_get_id(entry->pipe);
+            if (entry_pipe_id == pipe_id) {
+                is_writer = (entry->type == FD_TYPE_PIPE_WRITE) ? 1 : 0;
+                found = 1;
+                break;
+            }
+        }
+    }
+    
+    // Si no encontramos el pipe en la tabla de FDs, asumimos escritor por compatibilidad
+    // (aunque esto no debería pasar en uso normal)
+    if (!found) {
+        is_writer = 1;
+    }
+    
+    return pipe_close_by_id(pipe_id, is_writer);
 }
 
 // Asignar un pipe a un file descriptor específico
@@ -407,7 +438,9 @@ uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t
         if (entry->pipe) {
             uint64_t old_id = pipe_get_id(entry->pipe);
             if (old_id != 0) {
-                pipe_close_by_id(old_id);
+                // Determinar si el pipe previo era escritor o lector
+                int is_writer = (entry->type == FD_TYPE_PIPE_WRITE) ? 1 : 0;
+                pipe_close_by_id(old_id, is_writer);
             }
         }
         entry->pipe = NULL;
@@ -427,7 +460,9 @@ uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t
         entry->type = FD_TYPE_PIPE_WRITE;
     } else {
         // Modo inválido, cerrar el pipe que abrimos
-        pipe_close_by_id(pipe_id);
+        // Como no sabemos el tipo exacto, asumimos escritor por defecto
+        // (aunque esto no debería pasar ya que validamos mode antes)
+        pipe_close_by_id(pipe_id, 1);
         return 0;
     }
     

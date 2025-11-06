@@ -120,7 +120,9 @@ void process_destroy(process_t *p) {
                 // Obtener el ID del pipe para cerrarlo
                 uint64_t pipe_id = pipe_get_id(p->fds[i].pipe);
                 if (pipe_id != 0) {
-                    pipe_close_by_id(pipe_id);
+                    // Determinar si es escritor o lector basado en el tipo de FD
+                    int is_writer = (p->fds[i].type == FD_TYPE_PIPE_WRITE) ? 1 : 0;
+                    pipe_close_by_id(pipe_id, is_writer);
                 }
             }
             // Limpiar la entrada
@@ -150,7 +152,9 @@ void process_close_fds(process_t *p) {
             if (p->fds[i].pipe) {
                 uint64_t pipe_id = pipe_get_id(p->fds[i].pipe);
                 if (pipe_id != 0) {
-                    pipe_close_by_id(pipe_id);
+                    // Determinar si es escritor o lector basado en el tipo de FD
+                    int is_writer = (p->fds[i].type == FD_TYPE_PIPE_WRITE) ? 1 : 0;
+                    pipe_close_by_id(pipe_id, is_writer);
                 }
             }
             // Limpiar INMEDIATAMENTE para evitar cierre doble

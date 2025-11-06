@@ -163,7 +163,7 @@ int pipe_release_ref(uint64_t id) {
     return 1;
 }
 
-int pipe_close_by_id(uint64_t id) {
+int pipe_close_by_id(uint64_t id, int is_writer) {
     pipe_t *p = pipe_get_by_id(id);
     if (!p) return 0;
     
@@ -196,12 +196,16 @@ int pipe_close_by_id(uint64_t id) {
         sem_close_by_id(writers_id);
         sem_close_by_id(mutex_id);
     } else {
-        // Todavía hay referencias, marcar escritores como cerrados y despertar lectores
-        p->writers_closed = 1;
-        // Despertar a todos los lectores bloqueados señalando el semáforo múltiples veces
-        for (int i = 0; i < 100; i++) {  // Número arbitrario grande
-            sem_signal_by_id(p->sem_readers_id);
+        // Todavía hay referencias
+        // Solo marcar writers_closed si quien cierra es un escritor
+        if (is_writer) {
+            p->writers_closed = 1;
+            // Despertar a todos los lectores bloqueados señalando el semáforo múltiples veces
+            for (int i = 0; i < 100; i++) {  // Número arbitrario grande
+                sem_signal_by_id(p->sem_readers_id);
+            }
         }
+        // Si es un lector, solo decrementar refcount sin marcar writers_closed
         sem_signal_by_id(p->mutex_id);
     }
     
