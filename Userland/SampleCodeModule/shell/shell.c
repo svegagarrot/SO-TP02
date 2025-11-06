@@ -53,17 +53,6 @@ void readLine(char *buf, int maxLen) {
             continue;
         }
         
-        // Ctrl+C (0x03): limpiar línea y empezar de nuevo
-        if (c == 0x03) {
-            // Limpiar la línea actual
-            while (len > 0) {
-                len--;
-                putchar('\b'); putchar(' '); putchar('\b');
-            }
-            buf[0] = '\0';
-            printf("\n");
-            return;
-        }
         
         if (c == '\n') {
             putchar('\n');
