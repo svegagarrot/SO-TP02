@@ -6,6 +6,13 @@
 
 int g_run_in_background = 0;
 
+#define STDIN_FD 0
+#define STDOUT_FD 1
+
+static int find_command_index(const char *name);
+static int contains_pipe_symbol(const char *input);
+static int execute_pipeline(char *left_input, char *right_input);
+
 extern void _invalidOp();
 extern int64_t test_mm(uint64_t argc, char *argv[]);
 extern int64_t test_processes(uint64_t argc, char *argv[]);
@@ -142,6 +149,59 @@ static void ps_process_entry(void *arg) {
     printf("\nTotal de procesos: %llu\n", count);
 }
 
+// Wrapper para cat que se ejecuta como proceso
+static void cat_process_entry(void *arg) {
+    (void)arg;  // No se necesitan argumentos
+    
+    char buffer[256];
+    int n;
+    
+    while ((n = sys_read(STDIN_FD, buffer, sizeof(buffer) - 1)) > 0) {
+        buffer[n] = '\0';
+        printf("%s", buffer);
+    }
+}
+
+// Wrapper para wc que se ejecuta como proceso
+static void wc_process_entry(void *arg) {
+    (void)arg;  // No se necesitan argumentos
+    
+    char buffer[256];
+    int n;
+    int line_count = 0;
+    
+    while ((n = sys_read(STDIN_FD, buffer, sizeof(buffer))) > 0) {
+        for (int i = 0; i < n; i++) {
+            if (buffer[i] == '\n') {
+                line_count++;
+            }
+        }
+    }
+    
+    printf("%d\n", line_count);
+}
+
+// Wrapper para echo que imprime sus argumentos
+static void echo_process_entry(void *arg) {
+    char **argv = (char **)arg;
+    
+    if (argv != NULL && argv[0] != NULL) {
+        int i = 0;
+        while (argv[i] != NULL) {
+            printf("%s", argv[i]);
+            if (argv[i + 1] != NULL) {
+                printf(" ");
+            }
+            free(argv[i]);
+            i++;
+        }
+        printf("\n");
+        free(argv);
+    }
+}
+
+
+
 // Wrapper para mem que se ejecuta como proceso
 static void mem_process_entry(void *arg) {
     (void)arg;  // No se necesitan argumentos
@@ -206,6 +266,9 @@ const TShellCmd shellCmds[] = {
     {"nice", niceCmd, ": Cambia la prioridad de un proceso. Uso: nice <pid> <prioridad>\n", 1},  // built-in
     {"block", blockCmd, ": Cambia el estado de un proceso entre bloqueado y listo. Uso: block <pid>\n", 1},  // built-in
     {"mem", memCmd, ": Imprime el estado de la memoria\n", 0},                  // externo
+    {"cat", catCmd, ": Imprime el stdin tal como lo recibe\n", 0},             // externo
+    {"wc", wcCmd, ": Cuenta la cantidad de lineas del input\n", 0},            // externo
+    {"echo", echoCmd, ": Imprime argumentos. Uso: echo <texto>\n", 0},         // externo
     {NULL, NULL, NULL, 0}, 
 };
 
@@ -288,10 +351,168 @@ int fontSizeCmd(int argc, char *argv[]){
     return OK;
 }
 
+static int find_command_index(const char *name) {
+    if (name == NULL) {
+        return -1;
+    }
+    for (int i = 0; shellCmds[i].name; i++) {
+        if (strcmp(name, shellCmds[i].name) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static int contains_pipe_symbol(const char *input) {
+    if (!input) {
+        return 0;
+    }
+    for (const char *it = input; *it; ++it) {
+        if (*it == '|') {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int execute_pipeline(char *left_input, char *right_input) {
+    char *left_args[MAX_ARGS];
+    char *right_args[MAX_ARGS];
+
+    int left_argc = fillCommandAndArgs(left_args, left_input);
+    int right_argc = fillCommandAndArgs(right_args, right_input);
+
+    if (left_argc == 0 || right_argc == 0) {
+        printf("Error: formato de pipe invalido.\n");
+        return CMD_ERROR;
+    }
+
+    if ((left_argc > 0 && strcmp(left_args[left_argc - 1], "&") == 0) ||
+        (right_argc > 0 && strcmp(right_args[right_argc - 1], "&") == 0)) {
+        printf("Error: los pipes no soportan ejecucion en background.\n");
+        return CMD_ERROR;
+    }
+
+    int left_idx = find_command_index(left_args[0]);
+    int right_idx = find_command_index(right_args[0]);
+
+    if (left_idx < 0 || right_idx < 0) {
+        return ERROR;
+    }
+
+    if (shellCmds[left_idx].is_builtin || shellCmds[right_idx].is_builtin) {
+        printf("Error: los pipes solo pueden usarse con comandos externos.\n");
+        return CMD_ERROR;
+    }
+
+    uint64_t pipe_id = pipe_create();
+    if (pipe_id == 0) {
+        printf("Error: no se pudo crear el pipe.\n");
+        return CMD_ERROR;
+    }
+
+    int original_background = g_run_in_background;
+    int status = CMD_ERROR;
+    int stdout_attached = 0;
+    int stdin_attached = 0;
+    int64_t left_pid = -1;
+    int64_t right_pid = -1;
+
+    if (!pipe_dup(pipe_id, STDOUT_FD, 1)) {
+        printf("Error: no se pudo redirigir stdout al pipe.\n");
+        goto cleanup;
+    }
+    stdout_attached = 1;
+
+    reset_last_spawned_pid();
+    g_run_in_background = 1;
+    int left_result = shellCmds[left_idx].function(left_argc, left_args);
+    left_pid = get_last_spawned_pid();
+
+    if (stdout_attached) {
+        pipe_release_fd(STDOUT_FD);
+        stdout_attached = 0;
+    }
+
+    if (left_result == CMD_ERROR || left_pid <= 0) {
+        printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[left_idx].name);
+        goto cleanup;
+    }
+
+    if (!pipe_dup(pipe_id, STDIN_FD, 0)) {
+        printf("Error: no se pudo redirigir stdin al pipe.\n");
+        goto cleanup;
+    }
+    stdin_attached = 1;
+
+    reset_last_spawned_pid();
+    int right_result = shellCmds[right_idx].function(right_argc, right_args);
+    right_pid = get_last_spawned_pid();
+
+    if (stdin_attached) {
+        pipe_release_fd(STDIN_FD);
+        stdin_attached = 0;
+    }
+
+    if (right_result == CMD_ERROR || right_pid <= 0) {
+        printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[right_idx].name);
+        goto cleanup;
+    }
+
+    status = OK;
+
+cleanup:
+    if (stdout_attached) {
+        pipe_release_fd(STDOUT_FD);
+    }
+    if (stdin_attached) {
+        pipe_release_fd(STDIN_FD);
+    }
+
+    if (pipe_id != 0) {
+        pipe_close(pipe_id);
+    }
+    g_run_in_background = original_background;
+
+    if (left_pid > 0 && status == CMD_ERROR) {
+        my_wait(left_pid);
+    }
+
+    if (status == OK && !original_background) {
+        if (left_pid > 0) {
+            my_wait(left_pid);
+        }
+        if (right_pid > 0) {
+            my_wait(right_pid);
+        }
+    }
+
+    return status;
+}
+
 int CommandParse(char *commandInput){
     if(commandInput == NULL)
         return ERROR;
     
+    for (char *p = commandInput; *p; ++p) {
+        if (*p == '|') {
+            char *right_input = p + 1;
+            *p = '\0';
+
+            // Saltar espacios iniciales en la segunda parte
+            while (*right_input == ' ') {
+                right_input++;
+            }
+
+            if (contains_pipe_symbol(right_input)) {
+                printf("Error: solo se admite un pipe por comando.\n");
+                return CMD_ERROR;
+            }
+
+            return execute_pipeline(commandInput, right_input);
+        }
+    }
+
     char *args[MAX_ARGS];
     int argc = fillCommandAndArgs(args, commandInput);
 
@@ -877,6 +1098,100 @@ int memCmd(int argc, char *argv[]) {
         my_wait(pid);
     } else {
         printf("Proceso mem creado con PID: %lld (background)\n", pid);
+    }
+    
+    return OK;
+}
+
+// cat: Imprime stdin tal como lo recibe
+int catCmd(int argc, char *argv[]) {
+    extern int g_run_in_background;
+    
+    // Siempre crear como proceso separado
+    int is_foreground = g_run_in_background ? 0 : 1;
+    
+    int64_t pid = my_create_process("cat", cat_process_entry, NULL, 1, is_foreground);
+    if (pid <= 0) {
+        printf("Error: no se pudo crear el proceso cat.\n");
+        return CMD_ERROR;
+    }
+    
+    // Solo esperar y mostrar mensaje si NO estamos en background (no en pipe)
+    if (!g_run_in_background) {
+        my_wait(pid);
+    }
+    
+    return OK;
+}
+
+// wc: Cuenta la cantidad de líneas del input
+int wcCmd(int argc, char *argv[]) {
+    extern int g_run_in_background;
+    
+    // Siempre crear como proceso separado
+    int is_foreground = g_run_in_background ? 0 : 1;
+    
+    int64_t pid = my_create_process("wc", wc_process_entry, NULL, 1, is_foreground);
+    if (pid <= 0) {
+        printf("Error: no se pudo crear el proceso wc.\n");
+        return CMD_ERROR;
+    }
+    
+    // Solo esperar y mostrar mensaje si NO estamos en background (no en pipe)
+    if (!g_run_in_background) {
+        my_wait(pid);
+    }
+    
+    return OK;
+}
+
+// echo: Imprime sus argumentos
+int echoCmd(int argc, char *argv[]) {
+    extern int g_run_in_background;
+    
+    if (argc < 2) {
+        printf("\n");
+        return OK;
+    }
+    
+    // Copiar argumentos para pasarlos al proceso
+    char **process_argv = (char **)malloc((argc) * sizeof(char *));
+    if (process_argv == NULL) {
+        printf("Error: no se pudo asignar memoria.\n");
+        return CMD_ERROR;
+    }
+    
+    for (int i = 1; i < argc; i++) {
+        int len = 0;
+        while (argv[i][len] != '\0') len++;
+        
+        process_argv[i-1] = (char *)malloc(len + 1);
+        if (process_argv[i-1] == NULL) {
+            for (int j = 0; j < i-1; j++) free(process_argv[j]);
+            free(process_argv);
+            printf("Error: no se pudo asignar memoria.\n");
+            return CMD_ERROR;
+        }
+        
+        for (int j = 0; j < len; j++) {
+            process_argv[i-1][j] = argv[i][j];
+        }
+        process_argv[i-1][len] = '\0';
+    }
+    process_argv[argc-1] = NULL;
+    
+    int is_foreground = g_run_in_background ? 0 : 1;
+    
+    int64_t pid = my_create_process("echo", echo_process_entry, process_argv, 1, is_foreground);
+    if (pid <= 0) {
+        for (int i = 0; process_argv[i] != NULL; i++) free(process_argv[i]);
+        free(process_argv);
+        printf("Error: no se pudo crear el proceso echo.\n");
+        return CMD_ERROR;
+    }
+    
+    if (!g_run_in_background) {
+        my_wait(pid);
     }
     
     return OK;

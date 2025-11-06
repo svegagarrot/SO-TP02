@@ -282,6 +282,8 @@ void scheduler_finish_current(void) {
     if (!current || current == idle_p) {
         return;
     }
+    // Cerrar los file descriptors antes de marcar como terminado
+    process_close_fds(current);
     current->state = PROCESS_STATE_FINISHED;
     need_resched = 1;
 }
@@ -337,6 +339,9 @@ int scheduler_kill_by_pid(uint64_t pid) {
     }
     // marcar terminado y mover a finished
     sched_crit_enter();
+    
+    // Cerrar los file descriptors antes de marcar como terminado
+    process_close_fds(p);
     
     // Si el proceso tenía foreground, restaurar al padre
     if (p->is_foreground && p->parent && p->parent->state != PROCESS_STATE_FINISHED) {

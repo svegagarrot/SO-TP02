@@ -91,6 +91,8 @@ process_t * process_create(const char *name,
 
 void process_destroy(process_t *p);
 
+void process_close_fds(process_t *p);
+
 void process_attach_child(process_t *parent, process_t *child);
 void process_detach_child(process_t *child);
 

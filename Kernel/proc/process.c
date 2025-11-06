@@ -66,7 +66,32 @@ process_t *process_create(const char *name,
         p->fds[i].type = FD_TYPE_TERMINAL;
         p->fds[i].pipe = NULL;
     }
-    // Los primeros dos FDs ya están correctos (FD_TYPE_TERMINAL)
+    // Heredar file descriptors del padre para permitir redirecciones/pipe
+    if (parent) {
+        for (int i = 0; i < MAX_FDS; ++i) {
+            fd_entry_t *parent_fd = &parent->fds[i];
+            fd_entry_t *child_fd = &p->fds[i];
+
+            child_fd->type = parent_fd->type;
+
+            if (parent_fd->type == FD_TYPE_PIPE_READ || parent_fd->type == FD_TYPE_PIPE_WRITE) {
+                if (parent_fd->pipe) {
+                    uint64_t pipe_id = pipe_get_id(parent_fd->pipe);
+                    if (pipe_id != 0 && pipe_open_by_id(pipe_id)) {
+                        child_fd->pipe = parent_fd->pipe;
+                    } else {
+                        child_fd->type = FD_TYPE_TERMINAL;
+                        child_fd->pipe = NULL;
+                    }
+                } else {
+                    child_fd->type = FD_TYPE_TERMINAL;
+                    child_fd->pipe = NULL;
+                }
+            } else {
+                child_fd->pipe = NULL;
+            }
+        }
+    }
 
     if (parent) {
         p->parent       = parent;
@@ -115,6 +140,26 @@ void process_destroy(process_t *p) {
     if (p->user_stack_base)   mm_free(p->user_stack_base);
     mm_free(p);
 }
+
+// Cerrar los file descriptors de un proceso sin destruirlo
+void process_close_fds(process_t *p) {
+    if (!p) return;
+
+    for (int i = 0; i < MAX_FDS; i++) {
+        if (p->fds[i].type == FD_TYPE_PIPE_READ || p->fds[i].type == FD_TYPE_PIPE_WRITE) {
+            if (p->fds[i].pipe) {
+                uint64_t pipe_id = pipe_get_id(p->fds[i].pipe);
+                if (pipe_id != 0) {
+                    pipe_close_by_id(pipe_id);
+                }
+            }
+            // Limpiar INMEDIATAMENTE para evitar cierre doble
+            p->fds[i].type = FD_TYPE_TERMINAL;
+            p->fds[i].pipe = NULL;
+        }
+    }
+}
+
 
 void process_queue_init(process_queue_t *q) {
     if (!q) return;

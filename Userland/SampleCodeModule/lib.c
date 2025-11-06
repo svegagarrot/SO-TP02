@@ -2,6 +2,8 @@
 #include "include/syscall.h"
 #include <stdarg.h>
 
+static int64_t g_last_spawned_pid = -1;
+
 int get_regs(uint64_t *r) {
     return sys_regs(r);
 }
@@ -593,7 +595,9 @@ int64_t my_create_process(char *name, void *function, char *argv[], uint64_t pri
             return -1; // No se pudo resolver
         }
     }
-    return sys_create_process(name, function, argv, priority, is_foreground);
+    int64_t pid = (int64_t)sys_create_process(name, function, argv, priority, is_foreground);
+    g_last_spawned_pid = (pid > 0) ? pid : -1;
+    return pid;
 }
 
 int64_t my_kill(uint64_t pid) {
@@ -733,6 +737,18 @@ uint64_t pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode) {
         return 0;  // mode debe ser 0 (lectura) o 1 (escritura)
     }
     return sys_pipe_dup(pipe_id, fd, mode);
+}
+
+uint64_t pipe_release_fd(uint64_t fd) {
+    return sys_pipe_release_fd(fd);
+}
+
+void reset_last_spawned_pid(void) {
+    g_last_spawned_pid = -1;
+}
+
+int64_t get_last_spawned_pid(void) {
+    return g_last_spawned_pid;
 }
 
 uint64_t get_foreground_pid(void) {

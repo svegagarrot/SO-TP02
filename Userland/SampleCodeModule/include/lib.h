@@ -103,12 +103,15 @@ int64_t my_sem_close(char *sem_id);
 int64_t my_yield();
 int get_type_of_mm(char *buf, int buflen);
 uint64_t list_processes(process_info_t *buffer, uint64_t max_count);
+void reset_last_spawned_pid(void);
+int64_t get_last_spawned_pid(void);
 
 // Pipe functions
 uint64_t pipe_create(void);
 uint64_t pipe_open(uint64_t pipe_id);
 uint64_t pipe_close(uint64_t pipe_id);
 uint64_t pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode);
+uint64_t pipe_release_fd(uint64_t fd);
 
 // Get foreground process PID
 uint64_t get_foreground_pid(void);

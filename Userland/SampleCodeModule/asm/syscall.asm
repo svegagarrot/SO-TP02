@@ -39,6 +39,7 @@ GLOBAL sys_pipe_create
 GLOBAL sys_pipe_open
 GLOBAL sys_pipe_close
 GLOBAL sys_pipe_dup
+GLOBAL sys_pipe_release_fd
 GLOBAL sys_get_foreground_pid
 
 
@@ -393,10 +394,19 @@ sys_pipe_dup:
     pop rbp
     ret
 
-sys_get_foreground_pid:
+sys_pipe_release_fd:
     push rbp
     mov rbp, rsp
     mov rax, 39
+    int 0x80
+    mov rsp, rbp
+    pop rbp
+    ret
+
+sys_get_foreground_pid:
+    push rbp
+    mov rbp, rsp
+    mov rax, 40
     int 0x80
     mov rsp, rbp
     pop rbp

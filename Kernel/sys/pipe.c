@@ -16,6 +16,7 @@ struct pipe_t {
     size_t write_pos;
     size_t count;
     int refcount;
+    int writers_closed;  // Flag para indicar que no hay más escritores
     uint64_t sem_readers_id;   // Semáforo para lectores (inicialmente = 0)
     uint64_t sem_writers_id;   // Semáforo para escritores (inicialmente = PIPE_BUFFER_SIZE)
     uint64_t mutex_id;          // Mutex para exclusión mutua (inicialmente = 1)
@@ -98,6 +99,7 @@ uint64_t pipe_create(void) {
             p->write_pos = 0;
             p->count = 0;
             p->refcount = 1;
+            p->writers_closed = 0;  // Inicialmente hay escritores
             p->used = 1;
             
             return p->id;
@@ -151,6 +153,12 @@ int pipe_close_by_id(uint64_t id) {
         sem_close_by_id(writers_id);
         sem_close_by_id(mutex_id);
     } else {
+        // Todavía hay referencias, marcar escritores como cerrados y despertar lectores
+        p->writers_closed = 1;
+        // Despertar a todos los lectores bloqueados señalando el semáforo múltiples veces
+        for (int i = 0; i < 100; i++) {  // Número arbitrario grande
+            sem_signal_by_id(p->sem_readers_id);
+        }
         sem_signal_by_id(p->mutex_id);
     }
     
@@ -163,36 +171,50 @@ int pipe_read(pipe_t *p, char *buffer, size_t count) {
     }
     
     size_t bytes_read = 0;
-    
-    // Leer byte por byte
-    for (size_t i = 0; i < count; i++) {
-        // Esperar a que haya datos disponibles (bloqueante)
+
+    while (bytes_read < count) {
+        // Esperar por un byte disponible
         if (!sem_wait_by_id(p->sem_readers_id)) {
-            return bytes_read > 0 ? bytes_read : 0;
+            break;
         }
-        
-        // Obtener exclusión mutua
-        sem_wait_by_id(p->mutex_id);
-        
-        // Leer un byte del buffer circular
+
+        if (!sem_wait_by_id(p->mutex_id)) {
+            // Devolver el signal que consumimos
+            sem_signal_by_id(p->sem_readers_id);
+            break;
+        }
+
+        // Verificar si los escritores cerraron y no hay datos
+        if (p->count == 0 && p->writers_closed) {
+            sem_signal_by_id(p->mutex_id);
+            // Si ya leímos algo, retornar lo que leímos
+            // Si no leímos nada, esto es EOF
+            break;
+        }
+
+        // Debe haber al menos un dato si llegamos aquí
         if (p->count > 0) {
-            buffer[i] = p->buffer[p->read_pos];
+            buffer[bytes_read] = p->buffer[p->read_pos];
             p->read_pos = (p->read_pos + 1) % PIPE_BUFFER_SIZE;
             p->count--;
             bytes_read++;
             
-            // Liberar exclusión mutua
             sem_signal_by_id(p->mutex_id);
-            
-            // Señalar que hay más espacio disponible para escritores
             sem_signal_by_id(p->sem_writers_id);
+            
+            // Retornar después de leer al menos algo
+            // Esto evita bloquear esperando más datos
+            if (bytes_read > 0) {
+                break;
+            }
         } else {
-            // No había datos (no debería pasar si semáforos están bien sincronizados)
+            // No debería pasar, pero por seguridad
             sem_signal_by_id(p->mutex_id);
+            break;
         }
     }
     
-    return bytes_read;
+    return (int)bytes_read;
 }
 
 int pipe_write(pipe_t *p, const char *buffer, size_t count) {
@@ -201,35 +223,24 @@ int pipe_write(pipe_t *p, const char *buffer, size_t count) {
     }
     
     size_t bytes_written = 0;
-    
-    // Escribir byte por byte
-    for (size_t i = 0; i < count; i++) {
-        // Esperar a que haya espacio disponible (bloqueante)
+
+    while (bytes_written < count) {
         if (!sem_wait_by_id(p->sem_writers_id)) {
-            return bytes_written > 0 ? bytes_written : 0;
+            break;
         }
-        
-        // Obtener exclusión mutua
-        sem_wait_by_id(p->mutex_id);
-        
-        // Escribir un byte al buffer circular
-        if (p->count < PIPE_BUFFER_SIZE) {
-            p->buffer[p->write_pos] = buffer[i];
-            p->write_pos = (p->write_pos + 1) % PIPE_BUFFER_SIZE;
-            p->count++;
-            bytes_written++;
-            
-            // Liberar exclusión mutua
-            sem_signal_by_id(p->mutex_id);
-            
-            // Señalar que hay datos disponibles para lectores
-            sem_signal_by_id(p->sem_readers_id);
-        } else {
-            // No había espacio (no debería pasar si semáforos están bien sincronizados)
-            sem_signal_by_id(p->mutex_id);
+
+        if (!sem_wait_by_id(p->mutex_id)) {
+            break;
         }
+
+        p->buffer[p->write_pos] = buffer[bytes_written];
+        p->write_pos = (p->write_pos + 1) % PIPE_BUFFER_SIZE;
+        p->count++;
+        bytes_written++;
+
+        sem_signal_by_id(p->mutex_id);
+        sem_signal_by_id(p->sem_readers_id);
     }
     
-    return bytes_written;
+    return (int)bytes_written;
 }
-

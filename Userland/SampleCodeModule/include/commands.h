@@ -41,4 +41,7 @@ int killCmd(int argc, char *argv[]);
 int niceCmd(int argc, char *argv[]);
 int blockCmd(int argc, char *argv[]);
 int memCmd(int argc, char *argv[]);
+int catCmd(int argc, char *argv[]);
+int wcCmd(int argc, char *argv[]);
+int echoCmd(int argc, char *argv[]);
 #endif

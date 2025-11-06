@@ -400,6 +400,19 @@ uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t
         return 0;
     }
     
+    fd_entry_t *entry = &current_process->fds[fd];
+
+    // Liberar pipe previo asociado a este descriptor (si lo hubiera)
+    if (entry->type == FD_TYPE_PIPE_READ || entry->type == FD_TYPE_PIPE_WRITE) {
+        if (entry->pipe) {
+            uint64_t old_id = pipe_get_id(entry->pipe);
+            if (old_id != 0) {
+                pipe_close_by_id(old_id);
+            }
+        }
+        entry->pipe = NULL;
+    }
+
     // Abrir el pipe (incrementar refcount)
     if (!pipe_open_by_id(pipe_id)) {
         return 0;
@@ -408,18 +421,42 @@ uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t
     // Asignar el pipe al FD
     if (mode == 0) {
         // Modo lectura
-        current_process->fds[fd].type = FD_TYPE_PIPE_READ;
+        entry->type = FD_TYPE_PIPE_READ;
     } else if (mode == 1) {
         // Modo escritura
-        current_process->fds[fd].type = FD_TYPE_PIPE_WRITE;
+        entry->type = FD_TYPE_PIPE_WRITE;
     } else {
         // Modo inválido, cerrar el pipe que abrimos
         pipe_close_by_id(pipe_id);
         return 0;
     }
     
-    current_process->fds[fd].pipe = pipe;
+    entry->pipe = pipe;
     
+    return 1;
+}
+
+uint64_t syscall_pipe_release_fd(uint64_t fd, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    if (fd < 0 || fd >= MAX_FDS) {
+        return 0;
+    }
+
+    process_t *current_process = scheduler_current_process();
+    if (!current_process) {
+        return 0;
+    }
+
+    fd_entry_t *entry = &current_process->fds[fd];
+    if (entry->type == FD_TYPE_PIPE_READ || entry->type == FD_TYPE_PIPE_WRITE) {
+        if (entry->pipe) {
+            uint64_t pipe_id = pipe_get_id(entry->pipe);
+            if (pipe_id != 0) {
+                pipe_close_by_id(pipe_id);
+            }
+        }
+    }
+    entry->type = FD_TYPE_TERMINAL;
+    entry->pipe = NULL;
     return 1;
 }
 
