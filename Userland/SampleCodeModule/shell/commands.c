@@ -6,6 +6,9 @@
 
 int g_run_in_background = 0;
 
+uint64_t g_current_pipe_id = 0;
+int g_pipe_mode = -1;  // -1: sin pipe, 0: lectura (stdin), 1: escritura (stdout)
+
 #define STDIN_FD 0
 #define STDOUT_FD 1
 
@@ -153,6 +156,13 @@ static void ps_process_entry(void *arg) {
 static void cat_process_entry(void *arg) {
     (void)arg;  // No se necesitan argumentos
     
+    // Si hay un pipe configurado, conectarlo
+    if (g_current_pipe_id != 0 && g_pipe_mode == 1) {
+        // Modo escritura: redirigir stdout al pipe
+        pipe_open(g_current_pipe_id);
+        pipe_dup(g_current_pipe_id, STDOUT_FD, 1);
+    }
+    
     char buffer[256];
     int n;
     
@@ -160,11 +170,24 @@ static void cat_process_entry(void *arg) {
         buffer[n] = '\0';
         printf("%s", buffer);
     }
+    
+    // Liberar el pipe si fue usado
+    if (g_current_pipe_id != 0 && g_pipe_mode == 1) {
+        pipe_release_fd(STDOUT_FD);
+        pipe_close(g_current_pipe_id);
+    }
 }
 
 // Wrapper para wc que se ejecuta como proceso
 static void wc_process_entry(void *arg) {
     (void)arg;  // No se necesitan argumentos
+    
+    // Si hay un pipe configurado, conectarlo
+    if (g_current_pipe_id != 0 && g_pipe_mode == 0) {
+        // Modo lectura: redirigir stdin desde el pipe
+        pipe_open(g_current_pipe_id);
+        pipe_dup(g_current_pipe_id, STDIN_FD, 0);
+    }
     
     char buffer[256];
     int n;
@@ -179,11 +202,29 @@ static void wc_process_entry(void *arg) {
     }
     
     printf("%d\n", line_count);
+    
+    // Liberar el pipe si fue usado
+    if (g_current_pipe_id != 0 && g_pipe_mode == 0) {
+        pipe_release_fd(STDIN_FD);
+        pipe_close(g_current_pipe_id);
+    }
 }
 
 // Wrapper para filter que filtra vocales del input
 static void filter_process_entry(void *arg) {
     (void)arg;  // No se necesitan argumentos
+    
+    // Si hay un pipe configurado, conectarlo
+    if (g_current_pipe_id != 0) {
+        pipe_open(g_current_pipe_id);
+        if (g_pipe_mode == 0) {
+            // Modo lectura: redirigir stdin desde el pipe
+            pipe_dup(g_current_pipe_id, STDIN_FD, 0);
+        } else if (g_pipe_mode == 1) {
+            // Modo escritura: redirigir stdout al pipe
+            pipe_dup(g_current_pipe_id, STDOUT_FD, 1);
+        }
+    }
     
     char buffer[256];
     int n;
@@ -197,6 +238,16 @@ static void filter_process_entry(void *arg) {
                 printf("%c", c);
             }
         }
+    }
+    
+    // Liberar el pipe si fue usado
+    if (g_current_pipe_id != 0) {
+        if (g_pipe_mode == 0) {
+            pipe_release_fd(STDIN_FD);
+        } else if (g_pipe_mode == 1) {
+            pipe_release_fd(STDOUT_FD);
+        }
+        pipe_close(g_current_pipe_id);
     }
 }
 
@@ -617,65 +668,41 @@ static int execute_pipeline(char *left_input, char *right_input) {
 
     int original_background = g_run_in_background;
     int status = CMD_ERROR;
-    int stdout_attached = 0;
-    int stdin_attached = 0;
     int64_t left_pid = -1;
     int64_t right_pid = -1;
 
-    // Intentar redirigir stdout al pipe
-    if (!pipe_dup(pipe_id, STDOUT_FD, 1)) {
-        printf("Error: no se pudo redirigir stdout al pipe.\n");
-    } else {
-        stdout_attached = 1;
+    // Configurar pipe para el comando izquierdo (escritura)
+    g_current_pipe_id = pipe_id;
+    g_pipe_mode = 1;  // Modo escritura (stdout)
+    g_run_in_background = 1;
+    
+    reset_last_spawned_pid();
+    int left_result = shellCmds[left_idx].function(left_argc, left_args);
+    left_pid = get_last_spawned_pid();
 
-        // Ejecutar comando izquierdo
+    // Verificar si el comando izquierdo se ejecutó correctamente
+    if (left_result != CMD_ERROR && left_pid > 0) {
+        // Configurar pipe para el comando derecho (lectura)
+        g_current_pipe_id = pipe_id;
+        g_pipe_mode = 0;  // Modo lectura (stdin)
+        
         reset_last_spawned_pid();
-        g_run_in_background = 1;
-        int left_result = shellCmds[left_idx].function(left_argc, left_args);
-        left_pid = get_last_spawned_pid();
+        int right_result = shellCmds[right_idx].function(right_argc, right_args);
+        right_pid = get_last_spawned_pid();
 
-        // Liberar stdout inmediatamente
-        pipe_release_fd(STDOUT_FD);
-        stdout_attached = 0;
-
-        // Verificar si el comando izquierdo se ejecutó correctamente
-        if (left_result != CMD_ERROR && left_pid > 0) {
-            // Intentar redirigir stdin al pipe
-            if (!pipe_dup(pipe_id, STDIN_FD, 0)) {
-                printf("Error: no se pudo redirigir stdin al pipe.\n");
-            } else {
-                stdin_attached = 1;
-
-                // Ejecutar comando derecho
-                reset_last_spawned_pid();
-                int right_result = shellCmds[right_idx].function(right_argc, right_args);
-                right_pid = get_last_spawned_pid();
-
-                // Liberar stdin inmediatamente
-                pipe_release_fd(STDIN_FD);
-                stdin_attached = 0;
-
-                // Verificar si el comando derecho se ejecutó correctamente
-                if (right_result != CMD_ERROR && right_pid > 0) {
-                    status = OK;
-                } else {
-                    printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[right_idx].name);
-                }
-            }
+        // Verificar si el comando derecho se ejecutó correctamente
+        if (right_result != CMD_ERROR && right_pid > 0) {
+            status = OK;
         } else {
-            printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[left_idx].name);
+            printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[right_idx].name);
         }
+    } else {
+        printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[left_idx].name);
     }
 
-    // Cleanup: liberar file descriptors si todavía están adjuntos
-    if (stdout_attached) {
-        pipe_release_fd(STDOUT_FD);
-    }
-    if (stdin_attached) {
-        pipe_release_fd(STDIN_FD);
-    }
-
-    // Restaurar configuración de background
+    // Limpiar variables globales
+    g_current_pipe_id = 0;
+    g_pipe_mode = -1;
     g_run_in_background = original_background;
 
     // Manejar procesos según el resultado

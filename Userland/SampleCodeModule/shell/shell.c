@@ -41,15 +41,12 @@ void readLine(char *buf, int maxLen) {
     while (1) {
         c = getchar();
         
-        // Ctrl+D (0x04): enviar EOF
         if (c == 0x04) {
-            // Si la línea está vacía, comportamiento típico de EOF
             if (len == 0) {
                 printf("\n");
                 buf[0] = '\0';
                 return;
             }
-            // Si hay contenido, ignorar Ctrl+D
             continue;
         }
         
@@ -75,7 +72,7 @@ void readLine(char *buf, int maxLen) {
 }
 
 static void shellPrompt(){
-    printf("%s", "TP-ARQUI-");
+    printf("%s", "TP2-SO-");
     printf("%s", shellUser);
     printf("%s", ":~$ ");
 }

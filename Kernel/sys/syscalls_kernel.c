@@ -63,6 +63,14 @@ uint64_t syscall_read(int fd, char *buffer, int count) {
                 keyboard_wait_for_char();
                 continue;
             }
+            
+            // Detectar EOF (Ctrl+D = 0x04)
+            if (c == 0x04) {
+                // Si no hemos leído nada, retornar 0 (EOF)
+                // Si ya leímos algo, retornar lo que tenemos
+                break;
+            }
+            
             buffer[read++] = c;
             if (c == '\n') break;
         }
