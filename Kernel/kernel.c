@@ -1,9 +1,5 @@
-#include <stdint.h>
-#include <string.h>
 #include <lib.h>
 #include <moduleLoader.h>
-#include <naiveConsole.h>
-#include "videoDriver.h"
 #include "keyboardDriver.h"
 #include "scheduler.h"
 #include "mm.h"
@@ -46,29 +42,6 @@ void idle(){
 	}
 }
 
-//DESPUES BORRAR
-static void cpu_pause(volatile uint64_t iters) {
-    while (iters--) { __asm__ __volatile__("pause"); }
-}
-
-static void procA(void *arg) {
-    (void)arg;
-   while(1) {
-        video_putChar('A', FOREGROUND_COLOR, BACKGROUND_COLOR);
-        scheduler_yield_current();  // Test yield: debería cambiar a procB
-    }
-    scheduler_finish_current();
-}
-
-static void procB(void *arg) {
-    (void)arg;
-    while(1) {
-        video_putChar('B', FOREGROUND_COLOR, BACKGROUND_COLOR);
-        scheduler_yield_current();  // Test yield: debería cambiar a procA
-    }
-    scheduler_finish_current();
-}
-
 void * initializeKernelBinary()
 {
     void * moduleAddresses[] = {
@@ -91,14 +64,12 @@ int main()
 	pipe_system_init();
     keyboard_init();
 
-	//scheduler_spawn_process("A", procA, NULL, NULL, 0);
-	//scheduler_spawn_process("B", procB, NULL, NULL, 0);
-	scheduler_spawn_process("shell", (void*)sampleCodeModuleAddress, NULL, NULL, 2, 1);  // shell en foreground con prioridad alta
+	scheduler_spawn_process("shell", (void*)sampleCodeModuleAddress, NULL, NULL, 2, 1);
 
     load_idt();
 	_sti();
 
-	for(;;){ _hlt(); }
+	while(1){ _hlt(); }
 
     return 0;
 }
