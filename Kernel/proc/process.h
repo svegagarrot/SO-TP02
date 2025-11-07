@@ -87,7 +87,9 @@ process_t * process_create(const char *name,
                            process_entry_point_t entry_point,
                            void *entry_arg,
                            process_t *parent,
-                           int is_foreground);
+                           int is_foreground,
+                           uint64_t stdin_pipe_id,
+                           uint64_t stdout_pipe_id);
 
 void process_destroy(process_t *p);
 

@@ -240,7 +240,29 @@ uint64_t syscall_meminfo(uint64_t user_addr, uint64_t unused1, uint64_t unused2,
     return 1;
 }
 
-uint64_t syscall_create_process(char *name, void *function, char *argv[], uint64_t priority, int is_foreground) {
+uint64_t syscall_create_process(char *name, void *function, char *argv[], uint64_t priority, uint64_t is_foreground_and_pipes) {
+    // Desempaquetar parámetros:
+    // Bits 0-31: stdin_pipe_id
+    // Bits 32-63: stdout_pipe_id (solo si el bit más alto de is_foreground == 1, sino es is_foreground)
+    // Si is_foreground_and_pipes <= 1, entonces es el viejo formato (solo is_foreground)
+    
+    int is_foreground = 0;
+    uint64_t stdin_pipe_id = 0;
+    uint64_t stdout_pipe_id = 0;
+    
+    if (is_foreground_and_pipes <= 1) {
+        // Formato viejo: solo is_foreground
+        is_foreground = (int)is_foreground_and_pipes;
+    } else {
+        // Formato nuevo: empaquetado
+        // Bits 0-15: stdin_pipe_id
+        // Bits 16-31: stdout_pipe_id  
+        // Bit 32: is_foreground
+        stdin_pipe_id = is_foreground_and_pipes & 0xFFFF;
+        stdout_pipe_id = (is_foreground_and_pipes >> 16) & 0xFFFF;
+        is_foreground = (is_foreground_and_pipes >> 32) & 0x1;
+    }
+    
     process_t *parent = scheduler_current_process();
     
     // Si el proceso hijo va a foreground, el padre debe perder foreground
@@ -254,7 +276,9 @@ uint64_t syscall_create_process(char *name, void *function, char *argv[], uint64
         (void *)argv,
         parent,  // Pasar el padre para poder restaurar foreground después
         (uint8_t)priority,
-        is_foreground
+        is_foreground,
+        stdin_pipe_id,
+        stdout_pipe_id
     );
     if (!p) {
         // Si falla, restaurar foreground del padre

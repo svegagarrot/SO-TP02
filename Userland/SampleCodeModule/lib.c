@@ -647,8 +647,36 @@ int64_t my_create_process(char *name, void *function, char *argv[], uint64_t pri
             return -1; // No se pudo resolver
         }
     }
-    int64_t pid = (int64_t)sys_create_process(name, function, argv, priority, is_foreground);
-    g_last_spawned_pid = (pid > 0) ? pid : -1;
+    int64_t pid = (int64_t)sys_create_process(name, function, argv, priority, (uint64_t)is_foreground);
+    if (pid > 0) {
+        g_last_spawned_pid = pid;
+    }
+    return pid;
+}
+
+int64_t my_create_process_with_pipes(char *name, void *function, char *argv[], uint64_t priority, int is_foreground, uint64_t stdin_pipe_id, uint64_t stdout_pipe_id) {
+    // Some tests pass a small integer (argc) instead of NULL as the function
+    // argument (e.g. my_create_process("my_process_inc", 3, argv); ). Treat
+    // small integers as sentinel values and resolve the function by name.
+    if (function == NULL || (uintptr_t)function < 0x10000) {
+        function = resolve_function_by_name(name);
+        if (function == NULL) {
+            return -1; // No se pudo resolver
+        }
+    }
+    
+    // Empaquetar parámetros:
+    // Bits 0-15: stdin_pipe_id
+    // Bits 16-31: stdout_pipe_id  
+    // Bit 32: is_foreground
+    uint64_t packed = (stdin_pipe_id & 0xFFFF) | 
+                      ((stdout_pipe_id & 0xFFFF) << 16) | 
+                      (((uint64_t)is_foreground & 0x1) << 32);
+    
+    int64_t pid = (int64_t)sys_create_process(name, function, argv, priority, packed);
+    if (pid > 0) {
+        g_last_spawned_pid = pid;
+    }
     return pid;
 }
 

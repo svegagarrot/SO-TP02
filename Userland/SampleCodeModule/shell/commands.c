@@ -6,8 +6,9 @@
 
 int g_run_in_background = 0;
 
-uint64_t g_current_pipe_id = 0;
-int g_pipe_mode = -1;  // -1: sin pipe, 0: lectura (stdin), 1: escritura (stdout)
+// Variables temporales para pasar pipe IDs a los comandos durante la creación del proceso
+uint64_t g_stdin_pipe_id = 0;
+uint64_t g_stdout_pipe_id = 0;
 
 #define STDIN_FD 0
 #define STDOUT_FD 1
@@ -177,13 +178,6 @@ static void ps_process_entry(void *arg) {
 static void cat_process_entry(void *arg) {
     (void)arg;  // No se necesitan argumentos
     
-    // Si hay un pipe configurado, conectarlo
-    if (g_current_pipe_id != 0 && g_pipe_mode == 1) {
-        // Modo escritura: redirigir stdout al pipe
-        pipe_open(g_current_pipe_id);
-        pipe_dup(g_current_pipe_id, STDOUT_FD, 1);
-    }
-    
     char buffer[256];
     int n;
     
@@ -191,24 +185,11 @@ static void cat_process_entry(void *arg) {
         buffer[n] = '\0';
         printf("%s", buffer);
     }
-    
-    // Liberar el pipe si fue usado
-    if (g_current_pipe_id != 0 && g_pipe_mode == 1) {
-        pipe_release_fd(STDOUT_FD);
-        pipe_close(g_current_pipe_id);
-    }
 }
 
 // Wrapper para wc que se ejecuta como proceso
 static void wc_process_entry(void *arg) {
     (void)arg;  // No se necesitan argumentos
-    
-    // Si hay un pipe configurado, conectarlo
-    if (g_current_pipe_id != 0 && g_pipe_mode == 0) {
-        // Modo lectura: redirigir stdin desde el pipe
-        pipe_open(g_current_pipe_id);
-        pipe_dup(g_current_pipe_id, STDIN_FD, 0);
-    }
     
     char buffer[256];
     int n;
@@ -223,29 +204,11 @@ static void wc_process_entry(void *arg) {
     }
     
     printf("%d\n", line_count);
-    
-    // Liberar el pipe si fue usado
-    if (g_current_pipe_id != 0 && g_pipe_mode == 0) {
-        pipe_release_fd(STDIN_FD);
-        pipe_close(g_current_pipe_id);
-    }
 }
 
 // Wrapper para filter que filtra vocales del input
 static void filter_process_entry(void *arg) {
     (void)arg;  // No se necesitan argumentos
-    
-    // Si hay un pipe configurado, conectarlo
-    if (g_current_pipe_id != 0) {
-        pipe_open(g_current_pipe_id);
-        if (g_pipe_mode == 0) {
-            // Modo lectura: redirigir stdin desde el pipe
-            pipe_dup(g_current_pipe_id, STDIN_FD, 0);
-        } else if (g_pipe_mode == 1) {
-            // Modo escritura: redirigir stdout al pipe
-            pipe_dup(g_current_pipe_id, STDOUT_FD, 1);
-        }
-    }
     
     char buffer[256];
     int n;
@@ -259,16 +222,6 @@ static void filter_process_entry(void *arg) {
                 printf("%c", c);
             }
         }
-    }
-    
-    // Liberar el pipe si fue usado
-    if (g_current_pipe_id != 0) {
-        if (g_pipe_mode == 0) {
-            pipe_release_fd(STDIN_FD);
-        } else if (g_pipe_mode == 1) {
-            pipe_release_fd(STDOUT_FD);
-        }
-        pipe_close(g_current_pipe_id);
     }
 }
 
@@ -692,24 +645,31 @@ static int execute_pipeline(char *left_input, char *right_input) {
     int64_t left_pid = -1;
     int64_t right_pid = -1;
 
-    // Configurar pipe para el comando izquierdo (escritura)
-    g_current_pipe_id = pipe_id;
-    g_pipe_mode = 1;  // Modo escritura (stdout)
-    g_run_in_background = 1;
+    // Configurar pipe para el comando izquierdo (escritura a stdout)
+    // Los procesos en pipe se ejecutan en background para no bloquear al shell
+    // pero ambos procesos del pipe se esperan al final si el usuario no pidió background
+    int saved_background = g_run_in_background;
+    g_run_in_background = 1;  // Temporalmente en background para crear los procesos
+    g_stdout_pipe_id = pipe_id;  // Temporal para pasar al comando
     
     reset_last_spawned_pid();
     int left_result = shellCmds[left_idx].function(left_argc, left_args);
     left_pid = get_last_spawned_pid();
 
+    // Limpiar variable temporal
+    g_stdout_pipe_id = 0;
+
     // Verificar si el comando izquierdo se ejecutó correctamente
     if (left_result != CMD_ERROR && left_pid > 0) {
-        // Configurar pipe para el comando derecho (lectura)
-        g_current_pipe_id = pipe_id;
-        g_pipe_mode = 0;  // Modo lectura (stdin)
+        // Configurar pipe para el comando derecho (lectura desde stdin)
+        g_stdin_pipe_id = pipe_id;  // Temporal para pasar al comando
         
         reset_last_spawned_pid();
         int right_result = shellCmds[right_idx].function(right_argc, right_args);
         right_pid = get_last_spawned_pid();
+
+        // Limpiar variable temporal
+        g_stdin_pipe_id = 0;
 
         // Verificar si el comando derecho se ejecutó correctamente
         if (right_result != CMD_ERROR && right_pid > 0) {
@@ -721,10 +681,8 @@ static int execute_pipeline(char *left_input, char *right_input) {
         printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[left_idx].name);
     }
 
-    // Limpiar variables globales
-    g_current_pipe_id = 0;
-    g_pipe_mode = -1;
-    g_run_in_background = original_background;
+    // Restaurar el flag de background original
+    g_run_in_background = saved_background;
 
     // Manejar procesos según el resultado
     if (left_pid > 0 && status == CMD_ERROR) {
@@ -1390,11 +1348,21 @@ int memCmd(int argc, char *argv[]) {
 // cat: Imprime stdin tal como lo recibe
 int catCmd(int argc, char *argv[]) {
     extern int g_run_in_background;
+    extern uint64_t g_stdin_pipe_id;
+    extern uint64_t g_stdout_pipe_id;
     
     // Siempre crear como proceso separado
     int is_foreground = g_run_in_background ? 0 : 1;
     
-    int64_t pid = my_create_process("cat", cat_process_entry, NULL, 1, is_foreground);
+    int64_t pid;
+    if (g_stdin_pipe_id != 0 || g_stdout_pipe_id != 0) {
+        // Usar la nueva API con pipes
+        pid = my_create_process_with_pipes("cat", cat_process_entry, NULL, 1, is_foreground, g_stdin_pipe_id, g_stdout_pipe_id);
+    } else {
+        // Sin pipes
+        pid = my_create_process("cat", cat_process_entry, NULL, 1, is_foreground);
+    }
+    
     if (pid <= 0) {
         printf("Error: no se pudo crear el proceso cat.\n");
         return CMD_ERROR;
@@ -1411,11 +1379,21 @@ int catCmd(int argc, char *argv[]) {
 // wc: Cuenta la cantidad de líneas del input
 int wcCmd(int argc, char *argv[]) {
     extern int g_run_in_background;
+    extern uint64_t g_stdin_pipe_id;
+    extern uint64_t g_stdout_pipe_id;
     
     // Siempre crear como proceso separado
     int is_foreground = g_run_in_background ? 0 : 1;
     
-    int64_t pid = my_create_process("wc", wc_process_entry, NULL, 1, is_foreground);
+    int64_t pid;
+    if (g_stdin_pipe_id != 0 || g_stdout_pipe_id != 0) {
+        // Usar la nueva API con pipes
+        pid = my_create_process_with_pipes("wc", wc_process_entry, NULL, 1, is_foreground, g_stdin_pipe_id, g_stdout_pipe_id);
+    } else {
+        // Sin pipes
+        pid = my_create_process("wc", wc_process_entry, NULL, 1, is_foreground);
+    }
+    
     if (pid <= 0) {
         printf("Error: no se pudo crear el proceso wc.\n");
         return CMD_ERROR;
@@ -1484,11 +1462,21 @@ int echoCmd(int argc, char *argv[]) {
 // filter: Filtra las vocales del input
 int filterCmd(int argc, char *argv[]) {
     extern int g_run_in_background;
+    extern uint64_t g_stdin_pipe_id;
+    extern uint64_t g_stdout_pipe_id;
     
     // Siempre crear como proceso separado
     int is_foreground = g_run_in_background ? 0 : 1;
     
-    int64_t pid = my_create_process("filter", filter_process_entry, NULL, 1, is_foreground);
+    int64_t pid;
+    if (g_stdin_pipe_id != 0 || g_stdout_pipe_id != 0) {
+        // Usar la nueva API con pipes
+        pid = my_create_process_with_pipes("filter", filter_process_entry, NULL, 1, is_foreground, g_stdin_pipe_id, g_stdout_pipe_id);
+    } else {
+        // Sin pipes
+        pid = my_create_process("filter", filter_process_entry, NULL, 1, is_foreground);
+    }
+    
     if (pid <= 0) {
         printf("Error: no se pudo crear el proceso filter.\n");
         return CMD_ERROR;

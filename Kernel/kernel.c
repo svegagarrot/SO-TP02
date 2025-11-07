@@ -64,7 +64,7 @@ int main()
 	pipe_system_init();
     keyboard_init();
 
-	scheduler_spawn_process("shell", (void*)sampleCodeModuleAddress, NULL, NULL, 2, 1);
+	scheduler_spawn_process("shell", (void*)sampleCodeModuleAddress, NULL, NULL, 2, 1, 0, 0);
 
     load_idt();
 	_sti();

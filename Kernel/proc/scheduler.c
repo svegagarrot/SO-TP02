@@ -145,7 +145,7 @@ void init_scheduler(void) {
     process_queue_init(&blocked_q);
     process_queue_init(&finished_q);
 
-    idle_p = process_create("idle", idle_entry, NULL, NULL, 0);  // idle no es foreground
+    idle_p = process_create("idle", idle_entry, NULL, NULL, 0, 0, 0);  // idle no es foreground, sin pipes
     if (idle_p) {
         idle_p->state = PROCESS_STATE_RUNNING;
         current = idle_p;
@@ -233,8 +233,10 @@ process_t *scheduler_spawn_process(const char *name,
                                    void *entry_arg,
                                    process_t *parent,
                                    uint8_t priority,
-                                   int is_foreground) {
-    process_t *p = process_create(name, entry_point, entry_arg, parent, is_foreground);
+                                   int is_foreground,
+                                   uint64_t stdin_pipe_id,
+                                   uint64_t stdout_pipe_id) {
+    process_t *p = process_create(name, entry_point, entry_arg, parent, is_foreground, stdin_pipe_id, stdout_pipe_id);
     if (!p) {
         return NULL;
     }

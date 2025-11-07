@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#define STDIN 0
+#define STDOUT 1
 
 extern uint64_t setup_process_context(void *stack_top, void *entry_point, void *arg);
 
@@ -24,7 +26,9 @@ process_t *process_create(const char *name,
                           process_entry_point_t entry_point,
                           void *entry_arg,
                           process_t *parent,
-                          int is_foreground) {
+                          int is_foreground,
+                          uint64_t stdin_pipe_id,
+                          uint64_t stdout_pipe_id) {
     if (!entry_point) return NULL;
 
     process_t *p = (process_t *)mm_alloc(sizeof(process_t));
@@ -66,9 +70,33 @@ process_t *process_create(const char *name,
         p->fds[i].type = FD_TYPE_TERMINAL;
         p->fds[i].pipe = NULL;
     }
-    // Heredar file descriptors del padre para permitir redirecciones/pipe
+    
+    // Configurar stdin si se especificó un pipe
+    if (stdin_pipe_id != 0) {
+        pipe_t *stdin_pipe = pipe_get_by_id(stdin_pipe_id);
+        if (stdin_pipe && pipe_open_by_id(stdin_pipe_id)) {
+            p->fds[STDIN].type = FD_TYPE_PIPE_READ;
+            p->fds[STDIN].pipe = stdin_pipe;
+        }
+    }
+    
+    // Configurar stdout si se especificó un pipe
+    if (stdout_pipe_id != 0) {
+        pipe_t *stdout_pipe = pipe_get_by_id(stdout_pipe_id);
+        if (stdout_pipe && pipe_open_by_id(stdout_pipe_id)) {
+            p->fds[STDOUT].type = FD_TYPE_PIPE_WRITE;
+            p->fds[STDOUT].pipe = stdout_pipe;
+        }
+    }
+    
+    // Heredar otros file descriptors del padre (excepto stdin/stdout si fueron redirigidos)
     if (parent) {
         for (int i = 0; i < MAX_FDS; ++i) {
+            // Skip stdin/stdout si fueron redirigidos
+            if ((i == STDIN && stdin_pipe_id != 0) || (i == STDOUT && stdout_pipe_id != 0)) {
+                continue;
+            }
+            
             fd_entry_t *parent_fd = &parent->fds[i];
             fd_entry_t *child_fd = &p->fds[i];
 

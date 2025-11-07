@@ -14,7 +14,9 @@ process_t *scheduler_spawn_process(const char *name,
                                    void *entry_arg,
                                    process_t *parent,
                                    uint8_t priority,
-                                   int is_foreground);
+                                   int is_foreground,
+                                   uint64_t stdin_pipe_id,
+                                   uint64_t stdout_pipe_id);
 
 void scheduler_block_current(void);
 void scheduler_yield_current(void);
