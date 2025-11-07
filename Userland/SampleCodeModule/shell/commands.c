@@ -438,50 +438,52 @@ static int execute_pipeline(char *left_input, char *right_input) {
     int64_t left_pid = -1;
     int64_t right_pid = -1;
 
+    // Intentar redirigir stdout al pipe
     if (!pipe_dup(pipe_id, STDOUT_FD, 1)) {
         printf("Error: no se pudo redirigir stdout al pipe.\n");
-        goto cleanup;
-    }
-    stdout_attached = 1;
+    } else {
+        stdout_attached = 1;
 
-    reset_last_spawned_pid();
-    g_run_in_background = 1;
-    int left_result = shellCmds[left_idx].function(left_argc, left_args);
-    left_pid = get_last_spawned_pid();
+        // Ejecutar comando izquierdo
+        reset_last_spawned_pid();
+        g_run_in_background = 1;
+        int left_result = shellCmds[left_idx].function(left_argc, left_args);
+        left_pid = get_last_spawned_pid();
 
-    if (stdout_attached) {
+        // Liberar stdout inmediatamente
         pipe_release_fd(STDOUT_FD);
         stdout_attached = 0;
+
+        // Verificar si el comando izquierdo se ejecutó correctamente
+        if (left_result != CMD_ERROR && left_pid > 0) {
+            // Intentar redirigir stdin al pipe
+            if (!pipe_dup(pipe_id, STDIN_FD, 0)) {
+                printf("Error: no se pudo redirigir stdin al pipe.\n");
+            } else {
+                stdin_attached = 1;
+
+                // Ejecutar comando derecho
+                reset_last_spawned_pid();
+                int right_result = shellCmds[right_idx].function(right_argc, right_args);
+                right_pid = get_last_spawned_pid();
+
+                // Liberar stdin inmediatamente
+                pipe_release_fd(STDIN_FD);
+                stdin_attached = 0;
+
+                // Verificar si el comando derecho se ejecutó correctamente
+                if (right_result != CMD_ERROR && right_pid > 0) {
+                    status = OK;
+                } else {
+                    printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[right_idx].name);
+                }
+            }
+        } else {
+            printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[left_idx].name);
+        }
     }
 
-    if (left_result == CMD_ERROR || left_pid <= 0) {
-        printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[left_idx].name);
-        goto cleanup;
-    }
-
-    if (!pipe_dup(pipe_id, STDIN_FD, 0)) {
-        printf("Error: no se pudo redirigir stdin al pipe.\n");
-        goto cleanup;
-    }
-    stdin_attached = 1;
-
-    reset_last_spawned_pid();
-    int right_result = shellCmds[right_idx].function(right_argc, right_args);
-    right_pid = get_last_spawned_pid();
-
-    if (stdin_attached) {
-        pipe_release_fd(STDIN_FD);
-        stdin_attached = 0;
-    }
-
-    if (right_result == CMD_ERROR || right_pid <= 0) {
-        printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[right_idx].name);
-        goto cleanup;
-    }
-
-    status = OK;
-
-cleanup:
+    // Cleanup: liberar file descriptors si todavía están adjuntos
     if (stdout_attached) {
         pipe_release_fd(STDOUT_FD);
     }
@@ -489,10 +491,10 @@ cleanup:
         pipe_release_fd(STDIN_FD);
     }
 
-    // No cerramos el pipe aquí porque los procesos hijos tienen sus propias referencias.
-    // El pipe se destruirá automáticamente cuando ambos procesos terminen y cierren sus FDs.
+    // Restaurar configuración de background
     g_run_in_background = original_background;
 
+    // Manejar procesos según el resultado
     if (left_pid > 0 && status == CMD_ERROR) {
         my_wait(left_pid);
     }
