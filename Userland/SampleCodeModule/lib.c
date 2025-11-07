@@ -672,6 +672,11 @@ int64_t my_create_process_with_pipes(char *name, void *function, char *argv[], u
     uint64_t packed = (stdin_pipe_id & 0xFFFF) | 
                       ((stdout_pipe_id & 0xFFFF) << 16) | 
                       (((uint64_t)is_foreground & 0x1) << 32);
+
+    if (stdin_pipe_id != 0 || stdout_pipe_id != 0) {
+        // Marcar explícitamente que estamos usando el formato extendido (pipes)
+        packed |= (1ULL << 33);
+    }
     
     int64_t pid = (int64_t)sys_create_process(name, function, argv, priority, packed);
     if (pid > 0) {
