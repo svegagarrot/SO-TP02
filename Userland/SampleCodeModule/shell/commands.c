@@ -86,6 +86,27 @@ static void test_sync_wrapper(void *arg) {
     }
 }
 
+// Wrapper para test_no_synchro que se puede ejecutar como proceso
+static void test_no_synchro_wrapper(void *arg) {
+    char **argv = (char **)arg;
+    if (argv != NULL && argv[0] != NULL) {
+        // argv[0] = repeticiones, argv[1] = num_pares (puede ser NULL)
+        char *args[3];
+        args[0] = argv[0];
+        args[1] = "0"; // use_sem = 0 para no_synchro
+        if (argv[1] != NULL) {
+            args[2] = argv[1];
+            test_sync(3, args);
+        } else {
+            test_sync(2, args);
+        }
+        // Liberar memoria
+        free(argv[0]);
+        if (argv[1]) free(argv[1]);
+        free(argv);
+    }
+}
+
 // Helper para convertir estado a string
 static const char *state_to_string(int state) {
     switch (state) {
@@ -505,8 +526,8 @@ const TShellCmd shellCmds[] = {
     {"time", timeCmd, ": Muestra la hora actual\n", 1},                         // built-in
     {"font-size", fontSizeCmd, ": Cambia el tamanio de la fuente\n", 1},       // built-in
     {"testmm", testMMCmd, ": Ejecuta el stress test de memoria. Uso: testmm <max_mem>\n", 0},       // externo
-    {"testproceses", testProcesesCmd, ": Ejecuta el stress test de procesos. Uso: testproceses <max_proceses>\n", 0},  // externo
-    {"test_sync", testSyncCmd, ": Ejecuta test sincronizado con semaforos. Uso: test_sync <repeticiones>\n", 0},  // externo
+    {"test_proceses", testProcesesCmd, ": Ejecuta el stress test de procesos. Uso: test_proceses <max_proceses>\n", 0},  // externo
+    {"test_synchro", testSyncCmd, ": Ejecuta test sincronizado con semaforos. Uso: test_synchro <repeticiones>\n", 0},  // externo
     {"test_no_synchro", testNoSynchroCmd, ": Ejecuta test sin sincronizacion. Uso: test_no_synchro <repeticiones>\n", 0},  // externo
     {"test_priority", testPriorityCmd, ": Ejecuta el test de prioridades. Uso: test_priority <max_value>\n", 0},  // externo
     {"exceptions", exceptionCmd, ": Testear excepciones. Ingrese: exceptions [zero/invalidOpcode] para testear alguna operacion\n", 1},  // built-in
@@ -930,12 +951,12 @@ int testSyncCmd(int argc, char *argv[]) {
     
     // Crear proceso: foreground si NO hay &, background si hay &
     int is_foreground = g_run_in_background ? 0 : 1;
-    int64_t pid = my_create_process("test_sync", test_sync_wrapper, process_argv, 1, is_foreground);
+    int64_t pid = my_create_process("test_synchro", test_sync_wrapper, process_argv, 1, is_foreground);
     if (pid <= 0) {
         free(arg1_copy);
         if (argc == 3) free(process_argv[1]);
         free(process_argv);
-        printf("Error: no se pudo crear el proceso test_sync.\n");
+        printf("Error: no se pudo crear el proceso test_synchro.\n");
         return CMD_ERROR;
     }
     
@@ -950,27 +971,78 @@ int testSyncCmd(int argc, char *argv[]) {
 }
 
 int testNoSynchroCmd(int argc, char *argv[]) {
-    // Este comando NO debe correr en background ya que es un test
-    // Siempre lo ejecutamos directamente (foreground implícito)
+    extern int g_run_in_background;
+    
     if (argc < 2 || argc > 3) {
-        printf("Uso: test_no_synchro <repeticiones> [num_pares]\n");
+        printf("Uso: test_no_synchro <repeticiones> [num_pares] [&]\n");
         printf("  repeticiones: número de iteraciones por proceso\n");
         printf("  num_pares: número de pares de procesos (opcional, default=2)\n");
         return CMD_ERROR;
     }
 
-    char *targv[3];
-    targv[0] = argv[1];
-    targv[1] = "0"; /* do not use sem */
-    if (argc == 3) {
-        targv[2] = argv[2];  // número de pares especificado
-    }
-
-    int64_t res = (int64_t)test_sync(argc == 3 ? 3 : 2, targv);
-    if (res == -1) {
-        printf("test_no_synchro fallo\n");
+    // Siempre crear un proceso separado (foreground o background)
+    // Necesitamos 2 o 3 argumentos: repeticiones, [num_pares]
+    int num_args = (argc == 3) ? 2 : 1;
+    char **process_argv = (char **)malloc((num_args + 1) * sizeof(char *));
+    if (process_argv == NULL) {
+        printf("Error: no se pudo asignar memoria para el proceso.\n");
         return CMD_ERROR;
     }
+    
+    // Copiar repeticiones
+    char *arg1_copy = (char *)malloc(strlen(argv[1]) + 1);
+    if (arg1_copy == NULL) {
+        free(process_argv);
+        printf("Error: no se pudo asignar memoria para el proceso.\n");
+        return CMD_ERROR;
+    }
+    int idx = 0;
+    while (argv[1][idx] != '\0') {
+        arg1_copy[idx] = argv[1][idx];
+        idx++;
+    }
+    arg1_copy[idx] = '\0';
+    process_argv[0] = arg1_copy;
+    
+    // Copiar num_pares si existe
+    if (argc == 3) {
+        char *arg2_copy = (char *)malloc(strlen(argv[2]) + 1);
+        if (arg2_copy == NULL) {
+            free(arg1_copy);
+            free(process_argv);
+            printf("Error: no se pudo asignar memoria para el proceso.\n");
+            return CMD_ERROR;
+        }
+        idx = 0;
+        while (argv[2][idx] != '\0') {
+            arg2_copy[idx] = argv[2][idx];
+            idx++;
+        }
+        arg2_copy[idx] = '\0';
+        process_argv[1] = arg2_copy;
+        process_argv[2] = NULL;
+    } else {
+        process_argv[1] = NULL;
+    }
+    
+    // Crear proceso: foreground si NO hay &, background si hay &
+    int is_foreground = g_run_in_background ? 0 : 1;
+    int64_t pid = my_create_process("test_no_synchro", test_no_synchro_wrapper, process_argv, 1, is_foreground);
+    if (pid <= 0) {
+        free(arg1_copy);
+        if (argc == 3) free(process_argv[1]);
+        free(process_argv);
+        printf("Error: no se pudo crear el proceso test_no_synchro.\n");
+        return CMD_ERROR;
+    }
+    
+    if (g_run_in_background) {
+        printf("Test sin sincronizacion iniciado con PID: %lld (background)\n", pid);
+    } else {
+        // Foreground: esperar a que termine
+        my_wait(pid);
+    }
+    
     return OK;
 }
 
@@ -978,7 +1050,7 @@ int testProcesesCmd(int argc, char *argv[]) {
     extern int g_run_in_background;
     
     if (argc != 2) {
-        printf("Uso: testproceses <max_proceses> [&]\n");
+        printf("Uso: test_proceses <max_proceses> [&]\n");
         return CMD_ERROR;
     }
 
