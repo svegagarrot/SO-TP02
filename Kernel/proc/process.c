@@ -74,7 +74,7 @@ process_t *process_create(const char *name,
     // Configurar stdin si se especificó un pipe
     if (stdin_pipe_id != 0) {
         pipe_t *stdin_pipe = pipe_get_by_id(stdin_pipe_id);
-        if (stdin_pipe && pipe_open_by_id(stdin_pipe_id)) {
+        if (stdin_pipe && pipe_open_by_id(stdin_pipe_id, 0)) {  // is_writer=0 (lector)
             p->fds[STDIN].type = FD_TYPE_PIPE_READ;
             p->fds[STDIN].pipe = stdin_pipe;
         }
@@ -83,7 +83,7 @@ process_t *process_create(const char *name,
     // Configurar stdout si se especificó un pipe
     if (stdout_pipe_id != 0) {
         pipe_t *stdout_pipe = pipe_get_by_id(stdout_pipe_id);
-        if (stdout_pipe && pipe_open_by_id(stdout_pipe_id)) {
+        if (stdout_pipe && pipe_open_by_id(stdout_pipe_id, 1)) {  // is_writer=1 (escritor)
             p->fds[STDOUT].type = FD_TYPE_PIPE_WRITE;
             p->fds[STDOUT].pipe = stdout_pipe;
         }
@@ -105,8 +105,15 @@ process_t *process_create(const char *name,
             if (parent_fd->type == FD_TYPE_PIPE_READ || parent_fd->type == FD_TYPE_PIPE_WRITE) {
                 if (parent_fd->pipe) {
                     uint64_t pipe_id = pipe_get_id(parent_fd->pipe);
-                    if (pipe_id != 0 && pipe_open_by_id(pipe_id)) {
-                        child_fd->pipe = parent_fd->pipe;
+                    if (pipe_id != 0) {
+                        // Determinar is_writer según el tipo de FD del padre
+                        int is_writer = (parent_fd->type == FD_TYPE_PIPE_WRITE) ? 1 : 0;
+                        if (pipe_open_by_id(pipe_id, is_writer)) {
+                            child_fd->pipe = parent_fd->pipe;
+                        } else {
+                            child_fd->type = FD_TYPE_TERMINAL;
+                            child_fd->pipe = NULL;
+                        }
                     } else {
                         child_fd->type = FD_TYPE_TERMINAL;
                         child_fd->pipe = NULL;

@@ -48,7 +48,7 @@ uint64_t syscall_yield(uint64_t unused1, uint64_t unused2, uint64_t unused3, uin
 
 // Pipe syscalls
 uint64_t syscall_pipe_create(uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4, uint64_t unused5);
-uint64_t syscall_pipe_open(uint64_t pipe_id, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4);
+uint64_t syscall_pipe_open(uint64_t pipe_id, uint64_t is_writer, uint64_t unused2, uint64_t unused3, uint64_t unused4);
 uint64_t syscall_pipe_close(uint64_t pipe_id, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4);
 uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t unused1, uint64_t unused2);
 uint64_t syscall_pipe_release_fd(uint64_t fd, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4);

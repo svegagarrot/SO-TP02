@@ -404,8 +404,8 @@ uint64_t syscall_pipe_create(uint64_t unused1, uint64_t unused2, uint64_t unused
     return pipe_create();
 }
 
-uint64_t syscall_pipe_open(uint64_t pipe_id, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
-    return pipe_open_by_id(pipe_id);
+uint64_t syscall_pipe_open(uint64_t pipe_id, uint64_t is_writer, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
+    return pipe_open_by_id(pipe_id, (int)is_writer);
 }
 
 uint64_t syscall_pipe_close(uint64_t pipe_id, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
@@ -478,23 +478,23 @@ uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t
         entry->pipe = NULL;
     }
 
-    // Abrir el pipe (incrementar refcount)
-    if (!pipe_open_by_id(pipe_id)) {
-        return 0;
-    }
-    
-    // Asignar el pipe al FD
+    // Asignar el pipe al FD y abrir con el modo correcto
+    int is_writer_mode = 0;
     if (mode == 0) {
         // Modo lectura
         entry->type = FD_TYPE_PIPE_READ;
+        is_writer_mode = 0;
     } else if (mode == 1) {
         // Modo escritura
         entry->type = FD_TYPE_PIPE_WRITE;
+        is_writer_mode = 1;
     } else {
-        // Modo inválido, cerrar el pipe que abrimos
-        // Como no sabemos el tipo exacto, asumimos escritor por defecto
-        // (aunque esto no debería pasar ya que validamos mode antes)
-        pipe_close_by_id(pipe_id, 1);
+        // Modo inválido
+        return 0;
+    }
+    
+    // Abrir el pipe con el modo correcto
+    if (!pipe_open_by_id(pipe_id, is_writer_mode)) {
         return 0;
     }
     
@@ -518,9 +518,9 @@ uint64_t syscall_pipe_release_fd(uint64_t fd, uint64_t unused1, uint64_t unused2
         if (entry->pipe) {
             uint64_t pipe_id = pipe_get_id(entry->pipe);
             if (pipe_id != 0) {
-                // Usar pipe_release_ref en lugar de pipe_close_by_id
-                // para evitar cerrar el pipe si otros procesos lo usan
-                pipe_release_ref(pipe_id);
+                // Determinar si es escritor o lector basado en el tipo de FD
+                int is_writer = (entry->type == FD_TYPE_PIPE_WRITE) ? 1 : 0;
+                pipe_close_by_id(pipe_id, is_writer);
             }
         }
     }

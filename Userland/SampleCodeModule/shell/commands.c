@@ -6,16 +6,14 @@
 
 int g_run_in_background = 0;
 
-// Variables temporales para pasar pipe IDs a los comandos durante la creación del proceso
-uint64_t g_stdin_pipe_id = 0;
-uint64_t g_stdout_pipe_id = 0;
-
 #define STDIN_FD 0
 #define STDOUT_FD 1
 
 static int find_command_index(const char *name);
 static int contains_pipe_symbol(const char *input);
 static int execute_pipeline(char *left_input, char *right_input);
+static int64_t execute_external_command(const char *name, void *function, char *argv[], 
+                                        int is_foreground, uint64_t stdin_pipe_id, uint64_t stdout_pipe_id);
 
 extern void _invalidOp();
 extern int64_t test_mm(uint64_t argc, char *argv[]);
@@ -604,6 +602,60 @@ static int contains_pipe_symbol(const char *input) {
     return 0;
 }
 
+// Función helper para obtener la función de entrada del proceso desde el índice del comando
+static void *get_process_entry_function(int cmd_idx) {
+    if (cmd_idx < 0) return NULL;
+    
+    const char *name = shellCmds[cmd_idx].name;
+    if (!name) return NULL;
+    
+    // Mapear nombre del comando a su función de entrada
+    if (strcmp(name, "cat") == 0) return (void *)cat_process_entry;
+    if (strcmp(name, "wc") == 0) return (void *)wc_process_entry;
+    if (strcmp(name, "echo") == 0) return (void *)echo_process_entry;
+    if (strcmp(name, "filter") == 0) return (void *)filter_process_entry;
+    if (strcmp(name, "ps") == 0) return (void *)ps_process_entry;
+    if (strcmp(name, "loop") == 0) return (void *)loop_process_entry;
+    if (strcmp(name, "mem") == 0) return (void *)mem_process_entry;
+    if (strcmp(name, "mmtype") == 0) return (void *)mmtype_process_entry;
+    if (strcmp(name, "testmm") == 0) return (void *)test_mm_process_wrapper;
+    if (strcmp(name, "test_proceses") == 0) return (void *)test_processes_wrapper;
+    if (strcmp(name, "test_synchro") == 0) return (void *)test_sync_wrapper;
+    if (strcmp(name, "test_no_synchro") == 0) return (void *)test_no_synchro_wrapper;
+    if (strcmp(name, "test_priority") == 0) return (void *)test_prio_wrapper;
+    
+    return NULL;
+}
+
+// Función unificada para ejecutar comandos externos con o sin pipes
+static int64_t execute_external_command(const char *name, void *function, char *argv[], 
+                                        int is_foreground, uint64_t stdin_pipe_id, uint64_t stdout_pipe_id) {
+    if (!name || !function) {
+        return -1;
+    }
+    
+    int64_t pid;
+    
+    // Si hay pipes, usar my_create_process_with_pipes, sino usar my_create_process
+    if (stdin_pipe_id != 0 || stdout_pipe_id != 0) {
+        pid = my_create_process_with_pipes((char *)name, function, argv, 1, is_foreground, 
+                                           stdin_pipe_id, stdout_pipe_id);
+    } else {
+        pid = my_create_process((char *)name, function, argv, 1, is_foreground);
+    }
+    
+    if (pid <= 0) {
+        return -1;
+    }
+    
+    // Si está en foreground, esperar a que termine
+    if (is_foreground) {
+        my_wait(pid);
+    }
+    
+    return pid;
+}
+
 static int execute_pipeline(char *left_input, char *right_input) {
     char *left_args[MAX_ARGS];
     char *right_args[MAX_ARGS];
@@ -640,62 +692,96 @@ static int execute_pipeline(char *left_input, char *right_input) {
         return CMD_ERROR;
     }
 
-    int original_background = g_run_in_background;
+    // Obtener funciones de entrada de los procesos
+    void *left_function = get_process_entry_function(left_idx);
+    void *right_function = get_process_entry_function(right_idx);
+
+    if (!left_function || !right_function) {
+        printf("Error: no se pudo obtener la funcion de entrada del proceso.\n");
+        return CMD_ERROR;
+    }
+
+    // Preparar argumentos para el comando izquierdo (sin el nombre del comando)
+    char **left_process_argv = NULL;
+    if (left_argc > 1) {
+        left_process_argv = (char **)malloc((left_argc) * sizeof(char *));
+        if (left_process_argv) {
+            for (int i = 1; i < left_argc; i++) {
+                int len = strlen(left_args[i]) + 1;
+                left_process_argv[i-1] = (char *)malloc(len);
+                if (left_process_argv[i-1]) {
+                    strncpy(left_process_argv[i-1], left_args[i], len);
+                }
+            }
+            left_process_argv[left_argc-1] = NULL;
+        }
+    }
+
+    // Preparar argumentos para el comando derecho (sin el nombre del comando)
+    char **right_process_argv = NULL;
+    if (right_argc > 1) {
+        right_process_argv = (char **)malloc((right_argc) * sizeof(char *));
+        if (right_process_argv) {
+            for (int i = 1; i < right_argc; i++) {
+                int len = strlen(right_args[i]) + 1;
+                right_process_argv[i-1] = (char *)malloc(len);
+                if (right_process_argv[i-1]) {
+                    strncpy(right_process_argv[i-1], right_args[i], len);
+                }
+            }
+            right_process_argv[right_argc-1] = NULL;
+        }
+    }
+
+    // Ejecutar comando izquierdo con stdout redirigido al pipe
+    // Los procesos en pipe se ejecutan en background (is_foreground=0) para no bloquear
+    int64_t left_pid = execute_external_command(shellCmds[left_idx].name, left_function, 
+                                                 left_process_argv, 0, 0, pipe_id);
+
     int status = CMD_ERROR;
-    int64_t left_pid = -1;
     int64_t right_pid = -1;
 
-    // Configurar pipe para el comando izquierdo (escritura a stdout)
-    // Los procesos en pipe se ejecutan en background para no bloquear al shell
-    // pero ambos procesos del pipe se esperan al final si el usuario no pidió background
-    int saved_background = g_run_in_background;
-    g_run_in_background = 1;  // Temporalmente en background para crear los procesos
-    g_stdout_pipe_id = pipe_id;  // Temporal para pasar al comando
-    
-    reset_last_spawned_pid();
-    int left_result = shellCmds[left_idx].function(left_argc, left_args);
-    left_pid = get_last_spawned_pid();
+    if (left_pid > 0) {
+        // Ejecutar comando derecho con stdin redirigido desde el pipe
+        right_pid = execute_external_command(shellCmds[right_idx].name, right_function, 
+                                            right_process_argv, 0, pipe_id, 0);
 
-    // Limpiar variable temporal
-    g_stdout_pipe_id = 0;
-
-    // Verificar si el comando izquierdo se ejecutó correctamente
-    if (left_result != CMD_ERROR && left_pid > 0) {
-        // Configurar pipe para el comando derecho (lectura desde stdin)
-        g_stdin_pipe_id = pipe_id;  // Temporal para pasar al comando
-        
-        reset_last_spawned_pid();
-        int right_result = shellCmds[right_idx].function(right_argc, right_args);
-        right_pid = get_last_spawned_pid();
-
-        // Limpiar variable temporal
-        g_stdin_pipe_id = 0;
-
-        // Verificar si el comando derecho se ejecutó correctamente
-        if (right_result != CMD_ERROR && right_pid > 0) {
+        if (right_pid > 0) {
             status = OK;
         } else {
             printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[right_idx].name);
+            // Limpiar proceso izquierdo si falló el derecho
+            if (left_pid > 0) {
+                my_wait(left_pid);
+            }
         }
     } else {
         printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[left_idx].name);
     }
 
-    // Restaurar el flag de background original
-    g_run_in_background = saved_background;
-
-    // Manejar procesos según el resultado
-    if (left_pid > 0 && status == CMD_ERROR) {
-        my_wait(left_pid);
-    }
-
-    if (status == OK && !original_background) {
-        if (left_pid > 0) {
-            my_wait(left_pid);
-        }
+    // Si ambos procesos se crearon correctamente, esperar a ambos (foreground)
+    // Esperar primero al lector (derecho) y luego al escritor (izquierdo)
+    if (status == OK) {
         if (right_pid > 0) {
             my_wait(right_pid);
         }
+        if (left_pid > 0) {
+            my_wait(left_pid);
+        }
+    }
+
+    // Liberar argumentos copiados DESPUÉS de que los procesos terminen
+    if (left_process_argv) {
+        for (int i = 0; left_process_argv[i] != NULL; i++) {
+            free(left_process_argv[i]);
+        }
+        free(left_process_argv);
+    }
+    if (right_process_argv) {
+        for (int i = 0; right_process_argv[i] != NULL; i++) {
+            free(right_process_argv[i]);
+        }
+        free(right_process_argv);
     }
 
     return status;
@@ -807,7 +893,6 @@ int testMMCmd(int argc, char *argv[]) {
         return CMD_ERROR;
     }
 
-    // Siempre crear un proceso separado (foreground o background)
     // Copiar argumentos para el proceso
     char **process_argv = (char **)malloc(2 * sizeof(char *));
     if (process_argv == NULL) {
@@ -832,9 +917,9 @@ int testMMCmd(int argc, char *argv[]) {
     process_argv[0] = arg_copy;
     process_argv[1] = NULL;
     
-    // Crear proceso: foreground si NO hay &, background si hay &
     int is_foreground = g_run_in_background ? 0 : 1;
-    int64_t pid = my_create_process("test_mm", test_mm_process_wrapper, process_argv, 1, is_foreground);
+    int64_t pid = execute_external_command("test_mm", test_mm_process_wrapper, process_argv, is_foreground, 0, 0);
+    
     if (pid <= 0) {
         free(arg_copy);
         free(process_argv);
@@ -844,9 +929,6 @@ int testMMCmd(int argc, char *argv[]) {
     
     if (g_run_in_background) {
         printf("Test de memoria iniciado con PID: %lld (background)\n", pid);
-    } else {
-        // Foreground: esperar a que termine
-        my_wait(pid);
     }
     
     return OK;
@@ -862,7 +944,6 @@ int testSyncCmd(int argc, char *argv[]) {
         return CMD_ERROR;
     }
 
-    // Siempre crear un proceso separado (foreground o background)
     // Necesitamos 2 o 3 argumentos: repeticiones, [num_pares]
     int num_args = (argc == 3) ? 2 : 1;
     char **process_argv = (char **)malloc((num_args + 1) * sizeof(char *));
@@ -907,9 +988,9 @@ int testSyncCmd(int argc, char *argv[]) {
         process_argv[1] = NULL;
     }
     
-    // Crear proceso: foreground si NO hay &, background si hay &
     int is_foreground = g_run_in_background ? 0 : 1;
-    int64_t pid = my_create_process("test_synchro", test_sync_wrapper, process_argv, 1, is_foreground);
+    int64_t pid = execute_external_command("test_synchro", test_sync_wrapper, process_argv, is_foreground, 0, 0);
+    
     if (pid <= 0) {
         free(arg1_copy);
         if (argc == 3) free(process_argv[1]);
@@ -920,9 +1001,6 @@ int testSyncCmd(int argc, char *argv[]) {
     
     if (g_run_in_background) {
         printf("Test de sincronizacion iniciado con PID: %lld (background)\n", pid);
-    } else {
-        // Foreground: esperar a que termine
-        my_wait(pid);
     }
     
     return OK;
@@ -938,7 +1016,6 @@ int testNoSynchroCmd(int argc, char *argv[]) {
         return CMD_ERROR;
     }
 
-    // Siempre crear un proceso separado (foreground o background)
     // Necesitamos 2 o 3 argumentos: repeticiones, [num_pares]
     int num_args = (argc == 3) ? 2 : 1;
     char **process_argv = (char **)malloc((num_args + 1) * sizeof(char *));
@@ -983,9 +1060,9 @@ int testNoSynchroCmd(int argc, char *argv[]) {
         process_argv[1] = NULL;
     }
     
-    // Crear proceso: foreground si NO hay &, background si hay &
     int is_foreground = g_run_in_background ? 0 : 1;
-    int64_t pid = my_create_process("test_no_synchro", test_no_synchro_wrapper, process_argv, 1, is_foreground);
+    int64_t pid = execute_external_command("test_no_synchro", test_no_synchro_wrapper, process_argv, is_foreground, 0, 0);
+    
     if (pid <= 0) {
         free(arg1_copy);
         if (argc == 3) free(process_argv[1]);
@@ -996,9 +1073,6 @@ int testNoSynchroCmd(int argc, char *argv[]) {
     
     if (g_run_in_background) {
         printf("Test sin sincronizacion iniciado con PID: %lld (background)\n", pid);
-    } else {
-        // Foreground: esperar a que termine
-        my_wait(pid);
     }
     
     return OK;
@@ -1012,7 +1086,6 @@ int testProcesesCmd(int argc, char *argv[]) {
         return CMD_ERROR;
     }
 
-    // Siempre crear un proceso separado (foreground o background)
     // Copiar argumentos para el proceso
     char **process_argv = (char **)malloc(2 * sizeof(char *));
     if (process_argv == NULL) {
@@ -1037,9 +1110,9 @@ int testProcesesCmd(int argc, char *argv[]) {
     process_argv[0] = arg_copy;
     process_argv[1] = NULL;
     
-    // Crear proceso: foreground si NO hay &, background si hay &
     int is_foreground = g_run_in_background ? 0 : 1;
-    int64_t pid = my_create_process("test_processes", test_processes_wrapper, process_argv, 1, is_foreground);
+    int64_t pid = execute_external_command("test_processes", test_processes_wrapper, process_argv, is_foreground, 0, 0);
+    
     if (pid <= 0) {
         free(arg_copy);
         free(process_argv);
@@ -1049,9 +1122,6 @@ int testProcesesCmd(int argc, char *argv[]) {
     
     if (g_run_in_background) {
         printf("Test de procesos iniciado con PID: %lld (background)\n", pid);
-    } else {
-        // Foreground: esperar a que termine
-        my_wait(pid);
     }
 
     return OK;
@@ -1065,19 +1135,15 @@ int gameCmd(int argc, char *argv[]) {
 int mmTypeCmd(int argc, char *argv[]) {
     extern int g_run_in_background;
     
-    // Siempre crear como proceso separado
     int is_foreground = g_run_in_background ? 0 : 1;
+    int64_t pid = execute_external_command("mmtype", mmtype_process_entry, NULL, is_foreground, 0, 0);
     
-    int64_t pid = my_create_process("mmtype", mmtype_process_entry, NULL, 1, is_foreground);
     if (pid <= 0) {
         printf("Error: no se pudo crear el proceso mmtype.\n");
         return CMD_ERROR;
     }
     
-    if (!g_run_in_background) {
-        // Foreground: esperar a que termine
-        my_wait(pid);
-    } else {
+    if (g_run_in_background) {
         printf("Proceso mmtype creado con PID: %lld (background)\n", pid);
     }
     
@@ -1092,7 +1158,6 @@ int testPriorityCmd(int argc, char *argv[]) {
         return CMD_ERROR;
     }
     
-    // Siempre crear un proceso separado (foreground o background)
     // Copiar argumentos para el proceso
     char **process_argv = (char **)malloc(2 * sizeof(char *));
     if (process_argv == NULL) {
@@ -1117,9 +1182,9 @@ int testPriorityCmd(int argc, char *argv[]) {
     process_argv[0] = arg_copy;
     process_argv[1] = NULL;
     
-    // Crear proceso: foreground si NO hay &, background si hay &
     int is_foreground = g_run_in_background ? 0 : 1;
-    int64_t pid = my_create_process("test_prio", test_prio_wrapper, process_argv, 1, is_foreground);
+    int64_t pid = execute_external_command("test_prio", test_prio_wrapper, process_argv, is_foreground, 0, 0);
+    
     if (pid <= 0) {
         free(arg_copy);
         free(process_argv);
@@ -1129,9 +1194,6 @@ int testPriorityCmd(int argc, char *argv[]) {
     
     if (g_run_in_background) {
         printf("Test de prioridades iniciado con PID: %lld (background)\n", pid);
-    } else {
-        // Foreground: esperar a que termine
-        my_wait(pid);
     }
     
     return OK;
@@ -1140,19 +1202,15 @@ int testPriorityCmd(int argc, char *argv[]) {
 int psCmd(int argc, char *argv[]) {
     extern int g_run_in_background;
     
-    // Siempre crear como proceso separado
     int is_foreground = g_run_in_background ? 0 : 1;
+    int64_t pid = execute_external_command("ps", ps_process_entry, NULL, is_foreground, 0, 0);
     
-    int64_t pid = my_create_process("ps", ps_process_entry, NULL, 1, is_foreground);
     if (pid <= 0) {
         printf("Error: no se pudo crear el proceso ps.\n");
         return CMD_ERROR;
     }
     
-    if (!g_run_in_background) {
-        // Foreground: esperar a que termine
-        my_wait(pid);
-    } else {
+    if (g_run_in_background) {
         printf("Proceso ps creado con PID: %lld (background)\n", pid);
     }
     
@@ -1199,10 +1257,9 @@ int loopCmd(int argc, char *argv[]) {
     process_argv[0] = seconds_str;  // El número de segundos como string (copiado)
     process_argv[1] = NULL;
 
-    // Si hay &, ejecutar en background. Si no, en foreground.
     int is_foreground = g_run_in_background ? 0 : 1;
+    int64_t pid = execute_external_command("loop_process", loop_process_entry, process_argv, is_foreground, 0, 0);
     
-    int64_t pid = my_create_process("loop_process", loop_process_entry, process_argv, 1, is_foreground);
     if (pid <= 0) {
         free(seconds_str);
         free(process_argv);
@@ -1212,9 +1269,8 @@ int loopCmd(int argc, char *argv[]) {
 
     printf("Proceso loop creado con PID: %lld%s\n", pid, g_run_in_background ? " (background)" : "");
     
-    // Si NO es background, esperar a que termine el proceso
+    // Nota: execute_external_command ya esperó si es foreground
     if (!g_run_in_background) {
-        my_wait(pid);
         printf("\nProceso loop terminado.\n");
     }
     
@@ -1326,19 +1382,15 @@ int blockCmd(int argc, char *argv[]) {
 int memCmd(int argc, char *argv[]) {
     extern int g_run_in_background;
     
-    // Siempre crear como proceso separado
     int is_foreground = g_run_in_background ? 0 : 1;
+    int64_t pid = execute_external_command("mem", mem_process_entry, NULL, is_foreground, 0, 0);
     
-    int64_t pid = my_create_process("mem", mem_process_entry, NULL, 1, is_foreground);
     if (pid <= 0) {
         printf("Error: no se pudo crear el proceso mem.\n");
         return CMD_ERROR;
     }
     
-    if (!g_run_in_background) {
-        // Foreground: esperar a que termine
-        my_wait(pid);
-    } else {
+    if (g_run_in_background) {
         printf("Proceso mem creado con PID: %lld (background)\n", pid);
     }
     
@@ -1348,29 +1400,13 @@ int memCmd(int argc, char *argv[]) {
 // cat: Imprime stdin tal como lo recibe
 int catCmd(int argc, char *argv[]) {
     extern int g_run_in_background;
-    extern uint64_t g_stdin_pipe_id;
-    extern uint64_t g_stdout_pipe_id;
     
-    // Siempre crear como proceso separado
     int is_foreground = g_run_in_background ? 0 : 1;
-    
-    int64_t pid;
-    if (g_stdin_pipe_id != 0 || g_stdout_pipe_id != 0) {
-        // Usar la nueva API con pipes
-        pid = my_create_process_with_pipes("cat", cat_process_entry, NULL, 1, is_foreground, g_stdin_pipe_id, g_stdout_pipe_id);
-    } else {
-        // Sin pipes
-        pid = my_create_process("cat", cat_process_entry, NULL, 1, is_foreground);
-    }
+    int64_t pid = execute_external_command("cat", cat_process_entry, NULL, is_foreground, 0, 0);
     
     if (pid <= 0) {
         printf("Error: no se pudo crear el proceso cat.\n");
         return CMD_ERROR;
-    }
-    
-    // Solo esperar y mostrar mensaje si NO estamos en background (no en pipe)
-    if (!g_run_in_background) {
-        my_wait(pid);
     }
     
     return OK;
@@ -1379,29 +1415,13 @@ int catCmd(int argc, char *argv[]) {
 // wc: Cuenta la cantidad de líneas del input
 int wcCmd(int argc, char *argv[]) {
     extern int g_run_in_background;
-    extern uint64_t g_stdin_pipe_id;
-    extern uint64_t g_stdout_pipe_id;
     
-    // Siempre crear como proceso separado
     int is_foreground = g_run_in_background ? 0 : 1;
-    
-    int64_t pid;
-    if (g_stdin_pipe_id != 0 || g_stdout_pipe_id != 0) {
-        // Usar la nueva API con pipes
-        pid = my_create_process_with_pipes("wc", wc_process_entry, NULL, 1, is_foreground, g_stdin_pipe_id, g_stdout_pipe_id);
-    } else {
-        // Sin pipes
-        pid = my_create_process("wc", wc_process_entry, NULL, 1, is_foreground);
-    }
+    int64_t pid = execute_external_command("wc", wc_process_entry, NULL, is_foreground, 0, 0);
     
     if (pid <= 0) {
         printf("Error: no se pudo crear el proceso wc.\n");
         return CMD_ERROR;
-    }
-    
-    // Solo esperar y mostrar mensaje si NO estamos en background (no en pipe)
-    if (!g_run_in_background) {
-        my_wait(pid);
     }
     
     return OK;
@@ -1443,17 +1463,17 @@ int echoCmd(int argc, char *argv[]) {
     process_argv[argc-1] = NULL;
     
     int is_foreground = g_run_in_background ? 0 : 1;
+    int64_t pid = execute_external_command("echo", echo_process_entry, process_argv, is_foreground, 0, 0);
     
-    int64_t pid = my_create_process("echo", echo_process_entry, process_argv, 1, is_foreground);
+    // Liberar argumentos copiados (execute_external_command ya esperó si es foreground)
+    for (int i = 0; process_argv[i] != NULL; i++) {
+        free(process_argv[i]);
+    }
+    free(process_argv);
+    
     if (pid <= 0) {
-        for (int i = 0; process_argv[i] != NULL; i++) free(process_argv[i]);
-        free(process_argv);
         printf("Error: no se pudo crear el proceso echo.\n");
         return CMD_ERROR;
-    }
-    
-    if (!g_run_in_background) {
-        my_wait(pid);
     }
     
     return OK;
@@ -1462,29 +1482,13 @@ int echoCmd(int argc, char *argv[]) {
 // filter: Filtra las vocales del input
 int filterCmd(int argc, char *argv[]) {
     extern int g_run_in_background;
-    extern uint64_t g_stdin_pipe_id;
-    extern uint64_t g_stdout_pipe_id;
     
-    // Siempre crear como proceso separado
     int is_foreground = g_run_in_background ? 0 : 1;
-    
-    int64_t pid;
-    if (g_stdin_pipe_id != 0 || g_stdout_pipe_id != 0) {
-        // Usar la nueva API con pipes
-        pid = my_create_process_with_pipes("filter", filter_process_entry, NULL, 1, is_foreground, g_stdin_pipe_id, g_stdout_pipe_id);
-    } else {
-        // Sin pipes
-        pid = my_create_process("filter", filter_process_entry, NULL, 1, is_foreground);
-    }
+    int64_t pid = execute_external_command("filter", filter_process_entry, NULL, is_foreground, 0, 0);
     
     if (pid <= 0) {
         printf("Error: no se pudo crear el proceso filter.\n");
         return CMD_ERROR;
-    }
-    
-    // Solo esperar y mostrar mensaje si NO estamos en background (no en pipe)
-    if (!g_run_in_background) {
-        my_wait(pid);
     }
     
     return OK;
