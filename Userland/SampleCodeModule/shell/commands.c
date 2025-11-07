@@ -221,6 +221,189 @@ static void echo_process_entry(void *arg) {
 
 
 
+// Wrapper para escritores
+static void mvar_writer_entry(void *arg) {
+    char **argv = (char **)arg;
+    char writer_id = argv[0][0]; 
+    char sem_empty[32];
+    char sem_full[32];
+    char sem_mutex[32];
+    uint64_t pipe_id;
+    
+    int i = 0;
+    while (argv[1][i] != '\0' && i < 31) {
+        sem_empty[i] = argv[1][i];
+        i++;
+    }
+    sem_empty[i] = '\0';
+    
+    i = 0;
+    while (argv[2][i] != '\0' && i < 31) {
+        sem_full[i] = argv[2][i];
+        i++;
+    }
+    sem_full[i] = '\0';
+    
+    i = 0;
+    while (argv[3][i] != '\0' && i < 31) {
+        sem_mutex[i] = argv[3][i];
+        i++;
+    }
+    sem_mutex[i] = '\0';
+    
+    // Parsear pipe_id
+    pipe_id = 0;
+    i = 0;
+    while (argv[4][i] != '\0') {
+        pipe_id = pipe_id * 10 + (argv[4][i] - '0');
+        i++;
+    }
+    
+    // Liberar memoria
+    free(argv[0]);
+    free(argv[1]);
+    free(argv[2]);
+    free(argv[3]);
+    free(argv[4]);
+    free(argv);
+    
+    // Primero, abrir el pipe para obtener acceso
+    if (!pipe_open(pipe_id)) {
+        printf("Escritor %c: no pudo abrir el pipe %llu\n", writer_id, pipe_id);
+        return;
+    }
+    
+    // Conectar el pipe a un FD libre dentro del rango permitido
+    const int write_fd = 2;  
+    if (!pipe_dup(pipe_id, write_fd, 1)) {  
+        printf("Escritor %c: no pudo conectar el pipe\n", writer_id);
+        return;  // Error al conectar el pipe
+    }
+    
+    while (1) {
+        // Espera activa aleatoria (simulada con sleep)
+        int random_wait = (writer_id * 13) % 500 + 100;
+        sleep(random_wait);
+        
+        // 1. Esperar a que la MVar esté VACÍA
+        my_sem_wait(sem_empty);
+        my_sem_wait(sem_mutex);
+        
+        // 2. Escribir el valor en la variable compartida (pipe)
+        int written = sys_write(write_fd, &writer_id, 1);
+        if (written == 1) {
+            printf("Escritor %c escribio '%c'\n", writer_id, writer_id);
+            my_sem_post(sem_mutex);
+            // 4. Senalizar que hay un valor disponible
+            my_sem_post(sem_full);
+        } else {
+            printf("Escritor %c: error al escribir en la MVar\n", writer_id);
+            my_sem_post(sem_mutex);
+            // No se escribio nada, volver a habilitar a los escritores
+            my_sem_post(sem_empty);
+        }
+        // ===== FIN SECCIÓN CRÍTICA =====
+    }
+}
+
+// Wrapper para lectores
+static void mvar_reader_entry(void *arg) {
+    char **argv = (char **)arg;
+    int reader_id;
+    char sem_empty[32];
+    char sem_full[32];
+    char sem_mutex[32];
+    uint64_t pipe_id;
+    
+    // Parsear reader_id
+    reader_id = 0;
+    int i = 0;
+    while (argv[0][i] != '\0') {
+        reader_id = reader_id * 10 + (argv[0][i] - '0');
+        i++;
+    }
+    
+    // Copiar nombres de semáforos
+    i = 0;
+    while (argv[1][i] != '\0' && i < 31) {
+        sem_empty[i] = argv[1][i];
+        i++;
+    }
+    sem_empty[i] = '\0';
+    
+    i = 0;
+    while (argv[2][i] != '\0' && i < 31) {
+        sem_full[i] = argv[2][i];
+        i++;
+    }
+    sem_full[i] = '\0';
+    
+    i = 0;
+    while (argv[3][i] != '\0' && i < 31) {
+        sem_mutex[i] = argv[3][i];
+        i++;
+    }
+    sem_mutex[i] = '\0';
+    
+    // Parsear pipe_id
+    pipe_id = 0;
+    i = 0;
+    while (argv[4][i] != '\0') {
+        pipe_id = pipe_id * 10 + (argv[4][i] - '0');
+        i++;
+    }
+    
+    // Liberar memoria
+    free(argv[0]);
+    free(argv[1]);
+    free(argv[2]);
+    free(argv[3]);
+    free(argv[4]);
+    free(argv);
+    
+    // Primero, abrir el pipe para obtener acceso
+    if (!pipe_open(pipe_id)) {
+        printf("Lector %d: no pudo abrir el pipe %llu\n", reader_id, pipe_id);
+        return;
+    }
+    
+    // Conectar el pipe a un FD libre dentro del rango permitido
+    const int read_fd = 2;
+    if (!pipe_dup(pipe_id, read_fd, 0)) {  // mode=0 para lectura
+        printf("Lector %d: no pudo conectar el pipe\n", reader_id);
+        return;  // Error al conectar el pipe
+    }
+    
+    // Loop infinito
+    while (1) {
+        // Espera activa aleatoria
+        int random_wait = (reader_id * 17) % 500 + 100;
+        sleep(random_wait);
+        
+        // ===== SECCIÓN CRÍTICA: LEER =====
+        // 1. Esperar a que haya un valor disponible (MVar LLENA)
+        my_sem_wait(sem_full);
+        my_sem_wait(sem_mutex);
+        
+        // 2. Leer el valor de la variable compartida (pipe)
+        char read_value = '?';
+        int bytes_read = sys_read(read_fd, &read_value, 1);
+        
+        // 3. Imprimir el valor leido
+        if (bytes_read == 1) {
+            printf("Lector %d leyo '%c'\n", reader_id, read_value);
+        } else {
+            printf("Lector %d: error al leer la MVar\n", reader_id);
+        }
+        my_sem_post(sem_mutex);
+        
+        // 4. Senalizar que la MVar está VACÍA (lista para recibir nuevo valor)
+        my_sem_post(sem_empty);
+        // ===== FIN SECCIÓN CRÍTICA =====
+    }
+}
+
+
 // Wrapper para mem que se ejecuta como proceso
 static void mem_process_entry(void *arg) {
     (void)arg;  // No se necesitan argumentos
@@ -289,6 +472,7 @@ const TShellCmd shellCmds[] = {
     {"wc", wcCmd, ": Cuenta la cantidad de lineas del input\n", 0},            // externo
     {"echo", echoCmd, ": Imprime argumentos. Uso: echo <texto>\n", 0},         // externo
     {"filter", filterCmd, ": Filtra las vocales del input\n", 0},              // externo
+    {"mvar", mvarCmd, ": Simula MVar con lectores/escritores. Uso: mvar <escritores> <lectores>\n", 0},  // externo
     {NULL, NULL, NULL, 0}, 
 };
 
@@ -1235,6 +1419,229 @@ int filterCmd(int argc, char *argv[]) {
     if (!g_run_in_background) {
         my_wait(pid);
     }
+    
+    return OK;
+}
+
+// mvar: Simula MVar con múltiples lectores y escritores
+int mvarCmd(int argc, char *argv[]) {
+    if (argc != 3) {
+        printf("Uso: mvar <num_escritores> <num_lectores>\n");
+        printf("  num_escritores: cantidad de procesos escritores (1-26)\n");
+        printf("  num_lectores: cantidad de procesos lectores (1-20)\n");
+        return CMD_ERROR;
+    }
+    
+    int num_writers = atoi(argv[1]);
+    int num_readers = atoi(argv[2]);
+    
+    if (num_writers <= 0 || num_writers > 26) {
+        printf("Error: num_escritores debe estar entre 1 y 26.\n");
+        return CMD_ERROR;
+    }
+    
+    if (num_readers <= 0 || num_readers > 20) {
+        printf("Error: num_lectores debe estar entre 1 y 20.\n");
+        return CMD_ERROR;
+    }
+    
+    // Crear nombres únicos para los semáforos usando el PID actual
+    int64_t current_pid = my_getpid();
+    char sem_empty[32];
+    char sem_full[32];
+    char sem_mutex[32];
+    
+    sprintf(sem_empty, "mvar_e_%lld", current_pid);
+    sprintf(sem_full, "mvar_f_%lld", current_pid);
+    sprintf(sem_mutex, "mvar_m_%lld", current_pid);
+    
+    // Crear semáforos
+    // sem_empty: inicialmente 1 (variable vacía, escritores pueden escribir)
+    // sem_full: inicialmente 0 (no hay valor, lectores deben esperar)
+    // sem_mutex: inicialmente 1 (mutex libre)
+    if (my_sem_open(sem_empty, 1) < 0) {
+        printf("Error: no se pudo crear el semaforo empty.\n");
+        return CMD_ERROR;
+    }
+    
+    if (my_sem_open(sem_full, 0) < 0) {
+        printf("Error: no se pudo crear el semaforo full.\n");
+        my_sem_close(sem_empty);
+        return CMD_ERROR;
+    }
+    
+    if (my_sem_open(sem_mutex, 1) < 0) {
+        printf("Error: no se pudo crear el semaforo mutex.\n");
+        my_sem_close(sem_empty);
+        my_sem_close(sem_full);
+        return CMD_ERROR;
+    }
+    
+    // Crear pipe para comunicación entre escritores y lectores
+    uint64_t pipe_id = pipe_create();
+    if (pipe_id == 0) {
+        printf("Error: no se pudo crear el pipe.\n");
+        my_sem_close(sem_empty);
+        my_sem_close(sem_full);
+        my_sem_close(sem_mutex);
+        return CMD_ERROR;
+    }
+    
+    printf("Iniciando simulacion de MVar con %d escritores y %d lectores...\n", 
+           num_writers, num_readers);
+    printf("Pipe ID: %llu\n", pipe_id);
+    
+    // Crear procesos escritores
+    for (int i = 0; i < num_writers; i++) {
+        char **process_argv = (char **)malloc(6 * sizeof(char *));
+        if (process_argv == NULL) {
+            printf("Error: no se pudo asignar memoria para escritor %d.\n", i);
+            continue;
+        }
+        
+        // Argumento 0: ID del escritor
+        process_argv[0] = (char *)malloc(2);
+        if (process_argv[0] == NULL) {
+            free(process_argv);
+            continue;
+        }
+        process_argv[0][0] = 'A' + i;
+        process_argv[0][1] = '\0';
+        
+        // Argumento 1: sem_empty
+        int len = strlen(sem_empty);
+        process_argv[1] = (char *)malloc(len + 1);
+        if (process_argv[1] == NULL) {
+            free(process_argv[0]);
+            free(process_argv);
+            continue;
+        }
+        for (int j = 0; j <= len; j++) process_argv[1][j] = sem_empty[j];
+        
+        // Argumento 2: sem_full
+        len = strlen(sem_full);
+        process_argv[2] = (char *)malloc(len + 1);
+        if (process_argv[2] == NULL) {
+            free(process_argv[0]);
+            free(process_argv[1]);
+            free(process_argv);
+            continue;
+        }
+        for (int j = 0; j <= len; j++) process_argv[2][j] = sem_full[j];
+        
+        // Argumento 3: sem_mutex
+        len = strlen(sem_mutex);
+        process_argv[3] = (char *)malloc(len + 1);
+        if (process_argv[3] == NULL) {
+            free(process_argv[0]);
+            free(process_argv[1]);
+            free(process_argv[2]);
+            free(process_argv);
+            continue;
+        }
+        for (int j = 0; j <= len; j++) process_argv[3][j] = sem_mutex[j];
+        
+        // Argumento 4: pipe_id (como string)
+        process_argv[4] = (char *)malloc(32);
+        if (process_argv[4] == NULL) {
+            free(process_argv[0]);
+            free(process_argv[1]);
+            free(process_argv[2]);
+            free(process_argv[3]);
+            free(process_argv);
+            continue;
+        }
+        sprintf(process_argv[4], "%llu", pipe_id);
+        
+        process_argv[5] = NULL;
+        
+        char name[32];
+        sprintf(name, "writer_%c", 'A' + i);
+        
+        int64_t pid = my_create_process(name, mvar_writer_entry, process_argv, 1, 0);
+        if (pid <= 0) {
+            printf("Error: no se pudo crear el escritor %c.\n", 'A' + i);
+            for (int j = 0; j < 5; j++) free(process_argv[j]);
+            free(process_argv);
+        }
+    }
+    
+    // Crear procesos lectores
+    for (int i = 0; i < num_readers; i++) {
+        char **process_argv = (char **)malloc(6 * sizeof(char *));
+        if (process_argv == NULL) {
+            printf("Error: no se pudo asignar memoria para lector %d.\n", i);
+            continue;
+        }
+        
+        // Argumento 0: ID del lector
+        process_argv[0] = (char *)malloc(12);
+        if (process_argv[0] == NULL) {
+            free(process_argv);
+            continue;
+        }
+        sprintf(process_argv[0], "%d", i);
+        
+        // Argumento 1: sem_empty
+        int len = strlen(sem_empty);
+        process_argv[1] = (char *)malloc(len + 1);
+        if (process_argv[1] == NULL) {
+            free(process_argv[0]);
+            free(process_argv);
+            continue;
+        }
+        for (int j = 0; j <= len; j++) process_argv[1][j] = sem_empty[j];
+        
+        // Argumento 2: sem_full
+        len = strlen(sem_full);
+        process_argv[2] = (char *)malloc(len + 1);
+        if (process_argv[2] == NULL) {
+            free(process_argv[0]);
+            free(process_argv[1]);
+            free(process_argv);
+            continue;
+        }
+        for (int j = 0; j <= len; j++) process_argv[2][j] = sem_full[j];
+        
+        // Argumento 3: sem_mutex
+        len = strlen(sem_mutex);
+        process_argv[3] = (char *)malloc(len + 1);
+        if (process_argv[3] == NULL) {
+            free(process_argv[0]);
+            free(process_argv[1]);
+            free(process_argv[2]);
+            free(process_argv);
+            continue;
+        }
+        for (int j = 0; j <= len; j++) process_argv[3][j] = sem_mutex[j];
+        
+        // Argumento 4: pipe_id (como string)
+        process_argv[4] = (char *)malloc(32);
+        if (process_argv[4] == NULL) {
+            free(process_argv[0]);
+            free(process_argv[1]);
+            free(process_argv[2]);
+            free(process_argv[3]);
+            free(process_argv);
+            continue;
+        }
+        sprintf(process_argv[4], "%llu", pipe_id);
+        
+        process_argv[5] = NULL;
+        
+        char name[32];
+        sprintf(name, "reader_%d", i);
+        
+        int64_t pid = my_create_process(name, mvar_reader_entry, process_argv, 1, 0);
+        if (pid <= 0) {
+            printf("Error: no se pudo crear el lector %d.\n", i);
+            for (int j = 0; j < 5; j++) free(process_argv[j]);
+            free(process_argv);
+        }
+    }
+    
+    printf("Todos los procesos lectores y escritores han sido creados.\n");
+    printf("El proceso principal termina. Los procesos continuaran ejecutandose en background.\n");
     
     return OK;
 }

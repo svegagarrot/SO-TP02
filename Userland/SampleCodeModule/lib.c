@@ -391,6 +391,39 @@ int printf(const char *fmt, ...) {
     return count;
 }
 
+static int append_unsigned_to_str(char *dest, int *index, uint64_t value) {
+    if (value == 0) {
+        dest[(*index)++] = '0';
+        return 1;
+    }
+    
+    char buf[21];
+    int len = 0;
+    while (value > 0) {
+        buf[len++] = (char)('0' + (value % 10));
+        value /= 10;
+    }
+    
+    for (int i = len - 1; i >= 0; i--) {
+        dest[(*index)++] = buf[i];
+    }
+    return len;
+}
+
+static int append_signed_to_str(char *dest, int *index, long long value) {
+    int written = 0;
+    uint64_t magnitude;
+    if (value < 0) {
+        dest[(*index)++] = '-';
+        written++;
+        magnitude = (uint64_t)(-(value + 1)) + 1;
+    } else {
+        magnitude = (uint64_t)value;
+    }
+    written += append_unsigned_to_str(dest, index, magnitude);
+    return written;
+}
+
 int sprintf(char *str, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -398,60 +431,79 @@ int sprintf(char *str, const char *fmt, ...) {
     int str_index = 0;
 
     for (int i = 0; fmt[i] != '\0'; i++) {
-        if (fmt[i] == '%') {
-            i++;
-            switch (fmt[i]) {
-                case 's': {
-                    char *s = va_arg(args, char *);
-                    while (*s) {
-                        str[str_index++] = *s++;
-                        count++;
-                    }
-                    break;
-                }
-                case 'd': {
-                    int n = va_arg(args, int);
-                    if (n == 0) {
-                        str[str_index++] = '0';
-                        count++;
-                        break;
-                    }
-
-                    if (n < 0) {
-                        str[str_index++] = '-';
-                        n = -n;
-                        count++;
-                    }
-
-                    char buf[12];
-                    int buf_i = 0;
-
-                    while (n > 0) {
-                        buf[buf_i++] = (n % 10) + '0';
-                        n /= 10;
-                    }
-
-                    while (buf_i--) {
-                        str[str_index++] = buf[buf_i];
-                        count++;
-                    }
-                    break;
-                }
-                case 'c': {
-                    char c = (char)va_arg(args, int);
-                    str[str_index++] = c;
-                    count++;
-                    break;
-                }
-                default:
-                    str[str_index++] = '%';
-                    str[str_index++] = fmt[i];
-                    count += 2;
-                    break;
-            }
-        } else {
+        if (fmt[i] != '%') {
             str[str_index++] = fmt[i];
             count++;
+            continue;
+        }
+
+        i++;
+        if (fmt[i] == '\0') {
+            break;
+        }
+
+        if (fmt[i] == '%') {
+            str[str_index++] = '%';
+            count++;
+            continue;
+        }
+
+        int long_modifiers = 0;
+        while (fmt[i] == 'l') {
+            long_modifiers++;
+            i++;
+        }
+
+        char spec = fmt[i];
+        switch (spec) {
+            case 's': {
+                char *s = va_arg(args, char *);
+                while (s && *s) {
+                    str[str_index++] = *s++;
+                    count++;
+                }
+                break;
+            }
+            case 'c': {
+                char c = (char)va_arg(args, int);
+                str[str_index++] = c;
+                count++;
+                break;
+            }
+            case 'd': {
+                if (long_modifiers >= 2) {
+                    long long val = va_arg(args, long long);
+                    count += append_signed_to_str(str, &str_index, val);
+                } else if (long_modifiers == 1) {
+                    long val = va_arg(args, long);
+                    count += append_signed_to_str(str, &str_index, val);
+                } else {
+                    int val = va_arg(args, int);
+                    count += append_signed_to_str(str, &str_index, val);
+                }
+                break;
+            }
+            case 'u': {
+                if (long_modifiers >= 2) {
+                    unsigned long long val = va_arg(args, unsigned long long);
+                    count += append_unsigned_to_str(str, &str_index, val);
+                } else if (long_modifiers == 1) {
+                    unsigned long val = va_arg(args, unsigned long);
+                    count += append_unsigned_to_str(str, &str_index, val);
+                } else {
+                    unsigned int val = va_arg(args, unsigned int);
+                    count += append_unsigned_to_str(str, &str_index, val);
+                }
+                break;
+            }
+            default:
+                str[str_index++] = '%';
+                count++;
+                if (fmt[i] != '\0') {
+                    str[str_index++] = fmt[i];
+                    count++;
+                }
+                break;
         }
     }
     

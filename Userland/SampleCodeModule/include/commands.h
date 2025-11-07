@@ -45,4 +45,5 @@ int catCmd(int argc, char *argv[]);
 int wcCmd(int argc, char *argv[]);
 int echoCmd(int argc, char *argv[]);
 int filterCmd(int argc, char *argv[]);
+int mvarCmd(int argc, char *argv[]);
 #endif
