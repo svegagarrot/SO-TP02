@@ -2,6 +2,7 @@
 #include "../include/lib.h"
 #include "../include/shell.h"
 #include "../include/syscall.h"
+#include "../include/game.h"
 
 int g_run_in_background = 0;
 
@@ -509,6 +510,7 @@ const TShellCmd shellCmds[] = {
     {"test_no_synchro", testNoSynchroCmd, ": Ejecuta test sin sincronizacion. Uso: test_no_synchro <repeticiones>\n", 0},  // externo
     {"test_priority", testPriorityCmd, ": Ejecuta el test de prioridades. Uso: test_priority <max_value>\n", 0},  // externo
     {"exceptions", exceptionCmd, ": Testear excepciones. Ingrese: exceptions [zero/invalidOpcode] para testear alguna operacion\n", 1},  // built-in
+    {"jugar", gameCmd, ": Inicia el modo juego\n", 1},                          // built-in
     {"regs", regsCmd, ": Muestra los ultimos 18 registros de la CPU\n", 1},    // built-in
     {"mmtype", mmTypeCmd, ": Muestra el tipo de memory manager activo\n", 0},  // externo
     {"ps", psCmd, ": Lista todos los procesos con sus propiedades\n", 0},       // externo
@@ -1022,6 +1024,11 @@ int testProcesesCmd(int argc, char *argv[]) {
         my_wait(pid);
     }
 
+    return OK;
+}
+
+int gameCmd(int argc, char *argv[]) {
+    game_main_screen();
     return OK;
 }
 
