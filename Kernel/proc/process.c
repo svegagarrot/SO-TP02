@@ -49,7 +49,7 @@ process_t *process_create(const char *name,
     p->entry_point = entry_point;
     p->entry_arg   = entry_arg;
     p->state       = PROCESS_STATE_NEW;
-    p->is_foreground = is_foreground;  // Inicializar campo is_foreground
+    p->is_foreground = is_foreground; 
     p->priority      = PROCESS_PRIORITY_DEFAULT;
     p->base_priority = PROCESS_PRIORITY_DEFAULT;
     p->wait_ticks    = 0;
@@ -64,14 +64,11 @@ process_t *process_create(const char *name,
     p->queue_next = NULL;
     p->queue_prev = NULL;
 
-    // Inicializar tabla de file descriptors
-    // STDIN (fd 0) y STDOUT (fd 1) apuntan a terminal por defecto
     for (int i = 0; i < MAX_FDS; i++) {
         p->fds[i].type = FD_TYPE_TERMINAL;
         p->fds[i].pipe = NULL;
     }
     
-    // Configurar stdin si se especificó un pipe
     if (stdin_pipe_id != 0) {
         pipe_t *stdin_pipe = pipe_get_by_id(stdin_pipe_id);
         if (stdin_pipe && pipe_open_by_id(stdin_pipe_id, 0)) {  // is_writer=0 (lector)
@@ -80,7 +77,6 @@ process_t *process_create(const char *name,
         }
     }
     
-    // Configurar stdout si se especificó un pipe
     if (stdout_pipe_id != 0) {
         pipe_t *stdout_pipe = pipe_get_by_id(stdout_pipe_id);
         if (stdout_pipe && pipe_open_by_id(stdout_pipe_id, 1)) {  // is_writer=1 (escritor)
@@ -89,10 +85,8 @@ process_t *process_create(const char *name,
         }
     }
     
-    // Heredar otros file descriptors del padre (excepto stdin/stdout si fueron redirigidos)
     if (parent) {
         for (int i = 0; i < MAX_FDS; ++i) {
-            // Skip stdin/stdout si fueron redirigidos
             if ((i == STDIN && stdin_pipe_id != 0) || (i == STDOUT && stdout_pipe_id != 0)) {
                 continue;
             }
@@ -106,7 +100,6 @@ process_t *process_create(const char *name,
                 if (parent_fd->pipe) {
                     uint64_t pipe_id = pipe_get_id(parent_fd->pipe);
                     if (pipe_id != 0) {
-                        // Determinar is_writer según el tipo de FD del padre
                         int is_writer = (parent_fd->type == FD_TYPE_PIPE_WRITE) ? 1 : 0;
                         if (pipe_open_by_id(pipe_id, is_writer)) {
                             child_fd->pipe = parent_fd->pipe;
@@ -148,19 +141,15 @@ process_t *process_create(const char *name,
 void process_destroy(process_t *p) {
     if (!p) return;
 
-    // Cerrar todos los file descriptors que sean pipes
     for (int i = 0; i < MAX_FDS; i++) {
         if (p->fds[i].type == FD_TYPE_PIPE_READ || p->fds[i].type == FD_TYPE_PIPE_WRITE) {
             if (p->fds[i].pipe) {
-                // Obtener el ID del pipe para cerrarlo
                 uint64_t pipe_id = pipe_get_id(p->fds[i].pipe);
                 if (pipe_id != 0) {
-                    // Determinar si es escritor o lector basado en el tipo de FD
                     int is_writer = (p->fds[i].type == FD_TYPE_PIPE_WRITE) ? 1 : 0;
                     pipe_close_by_id(pipe_id, is_writer);
                 }
             }
-            // Limpiar la entrada
             p->fds[i].type = FD_TYPE_TERMINAL;
             p->fds[i].pipe = NULL;
         }
@@ -178,7 +167,6 @@ void process_destroy(process_t *p) {
     mm_free(p);
 }
 
-// Cerrar los file descriptors de un proceso sin destruirlo
 void process_close_fds(process_t *p) {
     if (!p) return;
 
@@ -187,12 +175,10 @@ void process_close_fds(process_t *p) {
             if (p->fds[i].pipe) {
                 uint64_t pipe_id = pipe_get_id(p->fds[i].pipe);
                 if (pipe_id != 0) {
-                    // Determinar si es escritor o lector basado en el tipo de FD
                     int is_writer = (p->fds[i].type == FD_TYPE_PIPE_WRITE) ? 1 : 0;
                     pipe_close_by_id(pipe_id, is_writer);
                 }
             }
-            // Limpiar INMEDIATAMENTE para evitar cierre doble
             p->fds[i].type = FD_TYPE_TERMINAL;
             p->fds[i].pipe = NULL;
         }
@@ -209,14 +195,14 @@ void process_queue_init(process_queue_t *q) {
 static void detach_from_queue(process_queue_t *q, process_t *p) {
     if (!q || !p) return;
 
-    // Verificar pertenencia: recorrer la cola y confirmar que 'p' está en 'q'.
     process_t *it = q->head;
     int found = 0;
     while (it) {
         if (it == p) { found = 1; break; }
         it = it->queue_next;
     }
-    if (!found) return; // 'p' no pertenece a esta cola; no hacer nada.
+    
+    if (!found) return;
 
     if (p->queue_prev) {
         p->queue_prev->queue_next = p->queue_next;
@@ -239,7 +225,14 @@ void process_queue_remove(process_queue_t *q, process_t *p) { detach_from_queue(
 
 void process_queue_push(process_queue_t *q, process_t *p) {
     if (!q || !p) return;
+    
     detach_from_queue(q, p);
+    
+    if (p->queue_next != NULL || p->queue_prev != NULL) {
+        p->queue_next = NULL;
+        p->queue_prev = NULL;
+    }
+    
     if (!q->head) {
         q->head = q->tail = p;
         p->queue_next = p->queue_prev = NULL;

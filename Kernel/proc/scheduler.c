@@ -2,6 +2,7 @@
 #include "process.h"
 #include "time.h"
 #include "interrupts.h"
+#include "keyboardDriver.h"
 #include <naiveConsole.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -9,13 +10,11 @@
 #define QUANTUM_TICKS 8
 #define MAX_FINISHED_COLLECT 4
 
-#define AGING_THRESHOLD 200     // Ticks de espera antes de boost (aumentado para debugging)
-#define AGING_BOOST 1          // Cuánto aumentar la prioridad
+#define AGING_THRESHOLD 200
+#define AGING_BOOST 1
 
-// Flag global para forzar reschedule inmediato
 static volatile int need_resched = 0;
 
-// Round-robin con prioridades: 0..2 (baja..alta)
 static process_queue_t ready_queues[PROCESS_PRIORITY_MAX - PROCESS_PRIORITY_MIN + 1];
 static process_queue_t blocked_q;
 static process_queue_t finished_q;
@@ -43,6 +42,10 @@ static int ready_queues_are_empty(void) {
 static void ready_queue_push(process_t *p) {
     if (!p) return;
     p->priority = clamp_priority(p->priority);
+    
+    process_queue_remove(&blocked_q, p);
+    process_queue_remove(&finished_q, p);
+    
     process_queue_push(&ready_queues[p->priority], p);
 }
 
@@ -59,28 +62,17 @@ static void idle_entry(void *unused) {
     for (;;) { _hlt(); }
 }
 
-// Función de aging: incrementa wait_ticks y aplica boost si es necesario
 static void apply_aging(void) {
     for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
         process_t *p = ready_queues[pr].head;
         while (p) {
             p->wait_ticks++;
             
-            // Si esperó suficiente y no está en máxima prioridad, hacer boost
             if (p->wait_ticks >= AGING_THRESHOLD && p->priority < PROCESS_PRIORITY_MAX) {
-                // Remover de la cola actual
                 process_queue_remove(&ready_queues[pr], p);
-                
-                // Aumentar prioridad temporalmente
                 p->priority = clamp_priority(p->priority + AGING_BOOST);
-                
-                // Reinsertar en la nueva cola de prioridad
                 process_queue_push(&ready_queues[p->priority], p);
-                
-                // Resetear contador
                 p->wait_ticks = 0;
-                
-                // Como modificamos la cola, reiniciar el recorrido
                 p = ready_queues[pr].head;
             } else {
                 p = p->queue_next;
@@ -89,26 +81,18 @@ static void apply_aging(void) {
     }
 }
 
-// Guardar contexto del proceso saliente y re-ubicarlo en la cola correcta
 static void save_context(process_t *p, uint64_t current_rsp) {
     if (!p) {
         return;
     }
 
     p->rsp = current_rsp;
-
-    // La pila en schedule() apunta al tope del pushState del handler:
-    // [0]=r15, [1]=r14, [2]=r13, [3]=r12, [4]=r11, [5]=r10, [6]=r9, [7]=r8,
-    // [8]=rsi, [9]=rdi, [10]=rbp, [11]=rdx, [12]=rcx, [13]=rbx, [14]=rax
-    // Por lo tanto, para guardar el RBP correcto del proceso debemos leer índice 10.
     p->rbp = ((uint64_t *)current_rsp)[10];
     
     switch (p->state) {
         case PROCESS_STATE_RUNNING:
             if (p != idle_p) {
                 p->state = PROCESS_STATE_READY; 
-                // En IRQ context IF ya está deshabilitado, pero mantener la
-                // convención de secciones críticas si se reutiliza.
                 ready_queue_push(p);
             } 
             break;
@@ -116,12 +100,11 @@ static void save_context(process_t *p, uint64_t current_rsp) {
             process_queue_push(&blocked_q, p);
             break;
         case PROCESS_STATE_FINISHED:
-            // Si el proceso terminado tenía foreground, restaurar al padre
             if (p->is_foreground && p->parent && p->parent->state != PROCESS_STATE_FINISHED) {
                 p->parent->is_foreground = 1;
+                keyboard_clear_buffer();
             }
             
-            // Despertar procesos que esperan por este PID
             while (p->waiters_head) {
                 process_t *w = p->waiters_head;
                 p->waiters_head = w->waiter_next;
@@ -160,15 +143,12 @@ uint64_t schedule(uint64_t current_rsp) {
 
     uint64_t now = ticks_elapsed();
 
-    // Aplicar aging para prevenir starvation
     apply_aging();
     apply_aging();  
 
-    // Preemptivo: chequeo de need_resched y condiciones de cambio
     bool quantum_expired = (now - last_switch_tick) >= QUANTUM_TICKS;
     bool must_switch = (current->state != PROCESS_STATE_RUNNING);
 
-    // ¿Hay uno de mayor prioridad listo?
     process_t *peek = NULL;
     for (int pr = PROCESS_PRIORITY_MAX; pr >= PROCESS_PRIORITY_MIN; --pr) {
         if (ready_queues[pr].head) {
@@ -193,11 +173,8 @@ uint64_t schedule(uint64_t current_rsp) {
     }
 
     next->state = PROCESS_STATE_RUNNING;
-    
-    // Resetear contador de espera cuando el proceso se ejecuta
     next->wait_ticks = 0;
     
-    // Si la prioridad fue boosteada por aging, restaurar la base
     if (next != idle_p && next->priority > next->base_priority) {
         next->priority = next->base_priority;
     }
@@ -205,7 +182,6 @@ uint64_t schedule(uint64_t current_rsp) {
     current = next;
     last_switch_tick = now;
 
-    // Limitar la cantidad de procesos terminados liberados por tick
     for (int i = 0; i < MAX_FINISHED_COLLECT; i++) {
         process_t *fp = scheduler_collect_finished();
         if (!fp) break;
@@ -240,7 +216,6 @@ process_t *scheduler_spawn_process(const char *name,
     if (!p) {
         return NULL;
     }
-    // Aplicar prioridad solicitada
     uint8_t pr = clamp_priority(priority);
     p->priority = pr;
     p->base_priority = pr;
@@ -261,8 +236,7 @@ void scheduler_yield_current(void) {
     if (!current || current == idle_p) {
         return;
     }
-    // Forzar expiración del quantum para cambio inmediato
-    last_switch_tick = ticks_elapsed() - QUANTUM_TICKS;  // quantum = 0 (siguiente!!)
+    last_switch_tick = ticks_elapsed() - QUANTUM_TICKS;
     callTimerTick();
 }
 
@@ -270,11 +244,11 @@ void scheduler_unblock_process(process_t *p) {
     if (!p) {
         return;
     }
+    
     sched_crit_enter();
     process_queue_remove(&blocked_q, p);
     p->state = PROCESS_STATE_READY;
     ready_queue_push(p);
-    // Si tiene mayor prioridad que el actual, forzar reschedule
     if (current && p->priority > current->priority)
         need_resched = 1;
     sched_crit_exit();
@@ -284,7 +258,7 @@ void scheduler_finish_current(void) {
     if (!current || current == idle_p) {
         return;
     }
-    // Cerrar los file descriptors antes de marcar como terminado
+    
     process_close_fds(current);
     current->state = PROCESS_STATE_FINISHED;
     need_resched = 1;
@@ -308,14 +282,17 @@ static process_t *find_in_queue(process_queue_t *q, uint64_t pid) {
 
 process_t *scheduler_find_by_pid(uint64_t pid) {
     process_t *p;
+    
     for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
         if ((p = find_in_queue(&ready_queues[pr], pid))) {
             return p;
         }
     }
+    
     if ((p = find_in_queue(&blocked_q, pid))) {
         return p;
     }
+    
     if ((p = find_in_queue(&finished_q, pid))) {
         return p;
     }
@@ -339,13 +316,10 @@ int scheduler_kill_by_pid(uint64_t pid) {
     if (!p) {
         return 0;
     }
-    // marcar terminado y mover a finished
     sched_crit_enter();
     
-    // Cerrar los file descriptors antes de marcar como terminado
     process_close_fds(p);
     
-    // Si el proceso tenía foreground, restaurar al padre
     if (p->is_foreground && p->parent && p->parent->state != PROCESS_STATE_FINISHED) {
         p->parent->is_foreground = 1;
     }
@@ -355,7 +329,6 @@ int scheduler_kill_by_pid(uint64_t pid) {
         process_queue_remove(&ready_queues[pr], p);
     }
     process_queue_remove(&blocked_q, p);
-    // Despertar waiters si los hay
     while (p->waiters_head) {
         process_t *w = p->waiters_head;
         p->waiters_head = w->waiter_next;
@@ -384,18 +357,16 @@ int scheduler_set_priority(uint64_t pid, uint8_t new_priority) {
     }
 
     if (p->state == PROCESS_STATE_READY) {
-        // Sacar de su cola actual
         process_queue_remove(&ready_queues[oldp], p);
     }
 
     p->priority = clamped;
-    p->base_priority = clamped;  // También actualizar base_priority
-    p->wait_ticks = 0;  // Resetear aging counter cuando se cambia prioridad manualmente
+    p->base_priority = clamped;
+    p->wait_ticks = 0;  
 
     if (p->state == PROCESS_STATE_READY) {
         ready_queue_push(p);
     }
-    // Si sube sobre el actual, forzar resched
     if (current && p->priority > current->priority)
         need_resched = 1;
     sched_crit_exit();
@@ -407,8 +378,8 @@ int scheduler_block_by_pid(uint64_t pid) {
     if (!p || p == idle_p) return 0;
 
     sched_crit_enter();
+    
     if (p == current) {
-        // Marcar y que el movimiento ocurra en save_context
         current->state = PROCESS_STATE_BLOCKED;
         need_resched = 1;
         sched_crit_exit();
@@ -423,9 +394,30 @@ int scheduler_block_by_pid(uint64_t pid) {
         sched_crit_exit();
         return 1;
     }
-    // Si ya está bloqueado o terminado no hacemos nada
+    
+    if (p->state == PROCESS_STATE_BLOCKED) {
+        sched_crit_exit();
+        return 1;
+    }
+    
+    if (p->state == PROCESS_STATE_FINISHED) {
+        sched_crit_exit();
+        return 0;
+    }
+    
+    for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
+        if (find_in_queue(&ready_queues[pr], pid)) {
+            process_queue_remove(&ready_queues[pr], p);
+            p->state = PROCESS_STATE_BLOCKED;
+            process_queue_push(&blocked_q, p);
+            need_resched = 1;
+            sched_crit_exit();
+            return 1;
+        }
+    }
+    
     sched_crit_exit();
-    return 1;
+    return 0;  
 }
 
 static void add_process_to_list(process_t *p, process_info_t *buffer, uint64_t *count, uint64_t max_count) {
@@ -435,18 +427,17 @@ static void add_process_to_list(process_t *p, process_info_t *buffer, uint64_t *
 
     buffer[*count].pid = p->pid;
     
-    // Copiar nombre asegurando terminador nulo
     int i;
     for (i = 0; i < PROCESS_NAME_MAX_LEN && p->name[i] != '\0'; i++) {
         buffer[*count].name[i] = p->name[i];
     }
-    buffer[*count].name[i] = '\0';  // Asegurar terminador en la posición correcta
+    buffer[*count].name[i] = '\0'; 
     
     buffer[*count].state = p->state;
     buffer[*count].priority = p->priority;
     buffer[*count].rsp = p->rsp;
     buffer[*count].rbp = p->rbp;
-    buffer[*count].foreground = p->is_foreground;  // Usar is_foreground del proceso
+    buffer[*count].foreground = p->is_foreground;  
     (*count)++;
 }
 
@@ -458,35 +449,29 @@ uint64_t scheduler_list_all_processes(process_info_t *buffer, uint64_t max_count
     sched_crit_enter();
     uint64_t count = 0;
 
-    // Agregar procesos de las colas ready por prioridad
     for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
         for (process_t *p = ready_queues[pr].head; p && count < max_count; p = p->queue_next) {
             add_process_to_list(p, buffer, &count, max_count);
         }
     }
 
-    // Agregar procesos bloqueados
     for (process_t *p = blocked_q.head; p && count < max_count; p = p->queue_next) {
         add_process_to_list(p, buffer, &count, max_count);
     }
 
-    // Agregar procesos terminados
     for (process_t *p = finished_q.head; p && count < max_count; p = p->queue_next) {
         add_process_to_list(p, buffer, &count, max_count);
     }
 
-    // Agregar proceso actual (si no está ya en alguna cola)
     if (current && count < max_count) {
-        // Verificar si current ya fue agregado
         int already_added = 0;
         for (uint64_t i = 0; i < count; i++) {
             if (buffer[i].pid == current->pid) {
                 already_added = 1;
-                // Actualizar la información del proceso current para asegurar que tiene foreground=1
                 buffer[i].state = current->state;
                 buffer[i].rsp = current->rsp;
                 buffer[i].rbp = current->rbp;
-                buffer[i].foreground = current->is_foreground;  // Usar is_foreground del proceso
+                buffer[i].foreground = current->is_foreground; 
                 break;
             }
         }
@@ -502,14 +487,12 @@ uint64_t scheduler_list_all_processes(process_info_t *buffer, uint64_t max_count
 uint64_t scheduler_get_foreground_pid(void) {
     sched_crit_enter();
     
-    // Buscar en current primero
     if (current && current != idle_p && current->is_foreground) {
         uint64_t pid = current->pid;
         sched_crit_exit();
         return pid;
     }
     
-    // Buscar en las colas ready
     for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
         for (process_t *p = ready_queues[pr].head; p; p = p->queue_next) {
             if (p->is_foreground) {
@@ -520,7 +503,6 @@ uint64_t scheduler_get_foreground_pid(void) {
         }
     }
     
-    // Buscar en blocked_q
     for (process_t *p = blocked_q.head; p; p = p->queue_next) {
         if (p->is_foreground) {
             uint64_t pid = p->pid;
@@ -530,5 +512,5 @@ uint64_t scheduler_get_foreground_pid(void) {
     }
     
     sched_crit_exit();
-    return 0;  // No hay proceso en foreground
+    return 0;
 }

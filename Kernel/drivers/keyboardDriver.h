@@ -57,5 +57,9 @@ void keyboard_init(void);
 /* Bloquea hasta que haya al menos un carácter disponible en el buffer */
 void keyboard_wait_for_char(void);
 
+/* Limpia el buffer del teclado y resetea el semáforo
+ * Se llama cuando se mata un proceso foreground con Ctrl+C */
+void keyboard_clear_buffer(void);
+
 
 #endif 

@@ -10,13 +10,12 @@ static char buffer_pop();
 static char buffer_push(char c);
 static char scToAscii(uint8_t scancode);
 static void updateFlags(uint8_t scancode);
+static void buffer_clear();
 
-//Flags teclas especiales
 static volatile uint8_t activeShift = 0;               //Shift presionado
 static volatile uint8_t activeCapsLock = 0;            //CapsLock presionado
 static volatile uint8_t activeCtrl = 0;                //Ctrl presionado
 
-// Arreglo para mantener el estado de las teclas
 uint8_t key_states[256] = {0};
 
 typedef struct CircleBuffer{
@@ -30,7 +29,6 @@ typedef struct CircleBuffer{
 static TCircleBuffer buffer = {.readIndex = 0, .writeIndex = 0, .size = 0};
 static uint64_t kbd_sem_id = 0;
 
-// En primer indice char sin shift, en segundo indice char con shift
 static const char scancode_table[KEY_COUNT][2] = {
     {0, 0}, {ESC, ESC}, {'1', '!'}, {'2', '@'}, {'3', '#'},
     {'4', '$'}, {'5', '%'}, {'6', '^'}, {'7', '&'}, {'8', '*'},
@@ -61,13 +59,12 @@ void keyboard_interrupt_handler() {
     if (activeCtrl && (cAscii == 'r' || cAscii == 'R')) {
         request_snapshot();
     } else if (activeCtrl && (cAscii == 'c' || cAscii == 'C')) {
-        // Ctrl+C: matar proceso en foreground inmediatamente
         uint64_t fg_pid = scheduler_get_foreground_pid();
         if (fg_pid != 0) {
             scheduler_kill_by_pid(fg_pid);
+            keyboard_clear_buffer();
         }
     } else if (activeCtrl && (cAscii == 'd' || cAscii == 'D')) {
-        // Ctrl+D: enviar carácter especial 0x04 para EOF
         if (buffer_push(0x04)) {
             if (kbd_sem_id != 0) {
                 sem_signal_by_id(kbd_sem_id);
@@ -144,6 +141,20 @@ void keyboard_wait_for_char(void) {
         if (kbd_sem_id != 0) {
             sem_wait_by_id(kbd_sem_id);
         }
+    }
+}
+
+static void buffer_clear(void) {
+    buffer.readIndex = 0;
+    buffer.writeIndex = 0;
+    buffer.size = 0;
+}
+
+void keyboard_clear_buffer(void) {
+    buffer_clear();
+    
+    if (kbd_sem_id != 0) {
+        sem_set_by_id(kbd_sem_id, 0);
     }
 }
 
