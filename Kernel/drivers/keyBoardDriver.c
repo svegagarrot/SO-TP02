@@ -64,8 +64,6 @@ void keyboard_interrupt_handler() {
         // Ctrl+C: matar proceso en foreground inmediatamente
         uint64_t fg_pid = scheduler_get_foreground_pid();
         if (fg_pid != 0) {
-            // Imprimir ^C en consola
-            ncPrint("^C\n");
             scheduler_kill_by_pid(fg_pid);
         }
     } else if (activeCtrl && (cAscii == 'd' || cAscii == 'D')) {
