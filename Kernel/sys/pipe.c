@@ -134,7 +134,6 @@ int pipe_close_by_id(uint64_t id, int is_writer) {
     
     // Decrementar contador de lectores o escritores
     int was_last_writer = 0;
-    int was_last_reader = 0;
     
     if (is_writer) {
         if (p->writers > 0) {
@@ -144,7 +143,8 @@ int pipe_close_by_id(uint64_t id, int is_writer) {
     } else {
         if (p->readers > 0) {
             p->readers--;
-            was_last_reader = (p->readers == 0);
+            // was_last_reader podría usarse para despertar escritores bloqueados
+            // pero actualmente no se implementa esa lógica
         }
     }
     

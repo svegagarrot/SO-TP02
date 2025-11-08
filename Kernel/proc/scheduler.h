@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include "process.h"
 
+// Flag global para forzar reschedule inmediato (visible desde assembly)
+extern volatile int need_resched;
+
 void init_scheduler(void);
 uint64_t schedule(uint64_t current_rsp);
 

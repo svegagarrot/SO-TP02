@@ -2,6 +2,7 @@
 #include "process.h"
 #include "time.h"
 #include "interrupts.h"
+#include "keyboardDriver.h"
 #include <naiveConsole.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -13,7 +14,8 @@
 #define AGING_BOOST 1          // Cuánto aumentar la prioridad
 
 // Flag global para forzar reschedule inmediato
-static volatile int need_resched = 0;
+// Debe ser visible desde assembly para chequeo en keyboard interrupt
+volatile int need_resched = 0;
 
 // Round-robin con prioridades: 0..2 (baja..alta)
 static process_queue_t ready_queues[PROCESS_PRIORITY_MAX - PROCESS_PRIORITY_MIN + 1];
@@ -33,6 +35,9 @@ static inline uint8_t clamp_priority(uint8_t pr) {
     return pr;
 }
 
+// Función auxiliar para verificar si todas las colas ready están vacías
+// (Mantenida para uso futuro si se necesita)
+__attribute__((unused))
 static int ready_queues_are_empty(void) {
     for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
         if (!process_queue_is_empty(&ready_queues[pr])) return 0;
@@ -119,6 +124,11 @@ static void save_context(process_t *p, uint64_t current_rsp) {
             // Si el proceso terminado tenía foreground, restaurar al padre
             if (p->is_foreground && p->parent && p->parent->state != PROCESS_STATE_FINISHED) {
                 p->parent->is_foreground = 1;
+                
+                // IMPORTANTE: Limpiar el buffer del teclado cuando termina un proceso foreground
+                // Esto evita que el shell procese comandos escritos mientras el proceso
+                // foreground estaba ejecutando (y probablemente no leyendo del teclado)
+                keyboard_clear_buffer();
             }
             
             // Despertar procesos que esperan por este PID
@@ -348,6 +358,11 @@ int scheduler_kill_by_pid(uint64_t pid) {
     // Si el proceso tenía foreground, restaurar al padre
     if (p->is_foreground && p->parent && p->parent->state != PROCESS_STATE_FINISHED) {
         p->parent->is_foreground = 1;
+        
+        // IMPORTANTE: Limpiar el buffer del teclado cuando se mata un proceso foreground
+        // Esto evita que el shell procese comandos escritos mientras el proceso
+        // foreground estaba ejecutando (y probablemente no leyendo del teclado)
+        keyboard_clear_buffer();
     }
     
     p->state = PROCESS_STATE_FINISHED;

@@ -1,6 +1,7 @@
 #include "keyboardDriver.h"
 #include "keystate.h"
 #include <naiveConsole.h>
+#include "videoDriver.h"
 #include "semaphore.h"
 #include "scheduler.h"
 
@@ -63,11 +64,24 @@ void keyboard_interrupt_handler() {
     } else if (activeCtrl && (cAscii == 'c' || cAscii == 'C')) {
         // Ctrl+C: matar proceso en foreground inmediatamente
         uint64_t fg_pid = scheduler_get_foreground_pid();
+        
+        // Imprimir ^C en consola usando video_putChar directamente
+        // (ncPrint no funciona bien en contexto de interrupción)
+        video_putChar('^', 0xFFFFFF, 0x000000);
+        video_putChar('C', 0xFFFFFF, 0x000000);
+        video_putChar('\n', 0xFFFFFF, 0x000000);
+        
         if (fg_pid != 0) {
-            // Imprimir ^C en consola
-            ncPrint("^C\n");
+            // Hay un proceso en foreground: matarlo
             scheduler_kill_by_pid(fg_pid);
         }
+        
+        // IMPORTANTE: Limpiar el buffer del teclado
+        // Esto evita que el shell procese comandos escritos
+        // mientras el proceso foreground estaba ejecutando, y
+        // también hace que la shell vuelva al prompt cuando se presiona
+        // Ctrl+C sin proceso en foreground
+        keyboard_clear_buffer();
     } else if (activeCtrl && (cAscii == 'd' || cAscii == 'D')) {
         // Ctrl+D: enviar carácter especial 0x04 para EOF
         if (buffer_push(0x04)) {
@@ -146,6 +160,18 @@ void keyboard_wait_for_char(void) {
         if (kbd_sem_id != 0) {
             sem_wait_by_id(kbd_sem_id);
         }
+    }
+}
+
+void keyboard_clear_buffer(void) {
+    // Limpiar el buffer circular
+    buffer.readIndex = 0;
+    buffer.writeIndex = 0;
+    buffer.size = 0;
+    
+    // Resetear el semáforo a 0 (no hay caracteres disponibles)
+    if (kbd_sem_id != 0) {
+        sem_set_by_id(kbd_sem_id, 0);
     }
 }
 
