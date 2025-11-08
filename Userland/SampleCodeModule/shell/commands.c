@@ -315,12 +315,11 @@ static void mvar_writer_entry(void *arg) {
         // 2. Escribir el valor en la variable compartida (pipe)
         int written = sys_write(write_fd, &writer_id, 1);
         if (written == 1) {
-            printf("Escritor %c escribio '%c'\n", writer_id, writer_id);
+            // Escritor no imprime nada, solo escribe silenciosamente
             my_sem_post(sem_mutex);
-            // 4. Senalizar que hay un valor disponible
+            // 3. Senalizar que hay un valor disponible
             my_sem_post(sem_full);
         } else {
-            printf("Escritor %c: error al escribir en la MVar\n", writer_id);
             my_sem_post(sem_mutex);
             // No se escribio nada, volver a habilitar a los escritores
             my_sem_post(sem_empty);
@@ -397,6 +396,18 @@ static void mvar_reader_entry(void *arg) {
         return;  // Error al conectar el pipe
     }
     
+    // Colores para cada lector (RGB en formato 0xRRGGBB)
+    uint32_t reader_colors[] = {
+        0xFF0000,  // Rojo - Lector 0
+        0x00FF00,  // Verde - Lector 1
+        0x0080FF,  // Azul claro - Lector 2
+        0xFFFF00,  // Amarillo - Lector 3
+        0xFF00FF,  // Magenta - Lector 4
+        0x00FFFF,  // Cyan - Lector 5
+    };
+    int num_colors = 6;
+    uint32_t my_color = reader_colors[reader_id % num_colors];
+    
     // Loop infinito
     while (1) {
         // Espera activa aleatoria
@@ -412,11 +423,9 @@ static void mvar_reader_entry(void *arg) {
         char read_value = '?';
         int bytes_read = sys_read(read_fd, &read_value, 1);
         
-        // 3. Imprimir el valor leido
+        // 3. Imprimir solo la letra en color
         if (bytes_read == 1) {
-            printf("Lector %d leyo '%c'\n", reader_id, read_value);
-        } else {
-            printf("Lector %d: error al leer la MVar\n", reader_id);
+            sys_video_putChar(read_value, my_color, 0x000000);
         }
         my_sem_post(sem_mutex);
         
