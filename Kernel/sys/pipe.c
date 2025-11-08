@@ -228,7 +228,16 @@ int pipe_read(pipe_t *p, char *buffer, size_t count) {
             sem_signal_by_id(p->mutex);
             sem_signal_by_id(p->sem_spaces);  // Señalar que hay un espacio disponible
         } else {
-            // No hay datos pero hay escritores, esperar por datos
+            // No hay datos pero hay escritores
+            // Si ya leímos algunos bytes, retornar los bytes parciales
+            // Esto permite que el lector procese los datos disponibles mientras
+            // el escritor está inactivo (ej: en sleep())
+            if (bytes_read > 0) {
+                sem_signal_by_id(p->mutex);
+                break;  // Retornar los bytes leídos hasta el momento
+            }
+            
+            // No hemos leído nada todavía, esperar por datos
             sem_signal_by_id(p->mutex);
             
             // Esperar por datos disponibles
