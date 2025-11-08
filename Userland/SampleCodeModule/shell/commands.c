@@ -734,7 +734,7 @@ static int execute_pipeline(char *left_input, char *right_input) {
     }
 
     // Ejecutar comando izquierdo con stdout redirigido al pipe
-    // Los procesos en pipe se ejecutan en background (is_foreground=0) para no bloquear
+    // El proceso izquierdo (escritor) se ejecuta en background
     int64_t left_pid = execute_external_command(shellCmds[left_idx].name, left_function, 
                                                  left_process_argv, 0, 0, pipe_id);
 
@@ -743,8 +743,9 @@ static int execute_pipeline(char *left_input, char *right_input) {
 
     if (left_pid > 0) {
         // Ejecutar comando derecho con stdin redirigido desde el pipe
+        // El proceso derecho (lector) se ejecuta en FOREGROUND para que Ctrl+C funcione
         right_pid = execute_external_command(shellCmds[right_idx].name, right_function, 
-                                            right_process_argv, 0, pipe_id, 0);
+                                            right_process_argv, 1, pipe_id, 0);
 
         if (right_pid > 0) {
             status = OK;
@@ -752,22 +753,23 @@ static int execute_pipeline(char *left_input, char *right_input) {
             printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[right_idx].name);
             // Limpiar proceso izquierdo si falló el derecho
             if (left_pid > 0) {
-                my_wait(left_pid);
+                my_kill(left_pid);
             }
         }
     } else {
         printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[left_idx].name);
     }
 
-    // Si ambos procesos se crearon correctamente, esperar a ambos (foreground)
-    // Esperar primero al lector (derecho) y luego al escritor (izquierdo)
-    if (status == OK) {
-        if (right_pid > 0) {
-            my_wait(right_pid);
-        }
-        if (left_pid > 0) {
-            my_wait(left_pid);
-        }
+    // El proceso derecho (foreground) ya fue esperado por execute_external_command
+    // Ahora debemos limpiar el proceso izquierdo
+    if (status == OK && left_pid > 0) {
+        // Dar un momento para que el proceso izquierdo detecte que el pipe se cerró
+        // y termine naturalmente
+        my_yield();
+        
+        // Si el proceso izquierdo todavía está vivo, matarlo
+        // (esto pasa si el proceso tiene un loop infinito y no verifica errores de write)
+        my_kill(left_pid);
     }
 
     // Liberar argumentos copiados DESPUÉS de que los procesos terminen
