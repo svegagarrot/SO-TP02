@@ -57,8 +57,5 @@ void keyboard_init(void);
 /* Bloquea hasta que haya al menos un carácter disponible en el buffer */
 void keyboard_wait_for_char(void);
 
-/* Limpia el buffer del teclado (descarta todos los caracteres pendientes) */
-void keyboard_clear_buffer(void);
-
 
 #endif 

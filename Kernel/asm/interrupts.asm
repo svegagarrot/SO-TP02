@@ -23,7 +23,6 @@ GLOBAL callTimerTick
 
 EXTERN scheduler_finish_current
 EXTERN schedule
-EXTERN need_resched
 
 EXTERN irqDispatcher
 EXTERN exceptionDispatcher
@@ -202,17 +201,6 @@ _irq01Handler:
     mov rdi, 1 
     call irqDispatcher
 
-    ; Chequear si keyboard_interrupt_handler mató un proceso (need_resched)
-    ; Si es así, hacer context switch inmediatamente
-    cmp dword [need_resched], 0
-    je .no_resched
-    
-    ; Hacer context switch (similar al timer interrupt)
-    mov rdi, rsp
-    call schedule
-    mov rsp, rax
-
-.no_resched:
     mov al, 20h
     out 20h, al
     popState
