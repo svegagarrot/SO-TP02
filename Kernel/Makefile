@@ -13,13 +13,15 @@ endif
 KERNEL=kernel.bin
 SOURCES=$(wildcard *.c)
 SOURCES_DRIVERS=$(wildcard drivers/*.c)
-SOURCES_SYS=$(wildcard sys/*.c)
+SOURCES_SYSCALLS=$(wildcard sys/syscalls/*.c)
+SOURCES_IPC=$(wildcard ipc/*.c)
 SOURCES_PROC=$(wildcard proc/*.c)
 SOURCES_UTILS=$(wildcard utils/*.c)
 SOURCES_ASM=$(wildcard asm/*.asm)
 OBJECTS=$(SOURCES:.c=.o)
 OBJECTS_DRIVERS=$(SOURCES_DRIVERS:.c=.o) 
-OBJECTS_SYS=$(SOURCES_SYS:.c=.o)
+OBJECTS_SYSCALLS=$(SOURCES_SYSCALLS:.c=.o)
+OBJECTS_IPC=$(SOURCES_IPC:.c=.o)
 # Build only the selected memory manager to avoid linking both implementations
 ifeq ($(MM),buddy)
 OBJECTS_MM=mm/mm_buddy.o
@@ -36,12 +38,12 @@ STATICLIBS=
 
 all: $(KERNEL)
 
-$(KERNEL): $(LOADEROBJECT) $(OBJECTS) $(OBJECTS_DRIVERS) $(OBJECTS_SYS) $(OBJECTS_MM) $(OBJECTS_PROC) $(OBJECTS_UTILS) $(STATICLIBS) $(OBJECTS_ASM)
-	$(LD) $(LDFLAGS) -T kernel.ld -o $(KERNEL) $(LOADEROBJECT) $(OBJECTS) $(OBJECTS_DRIVERS) $(OBJECTS_SYS) $(OBJECTS_MM) $(OBJECTS_PROC) $(OBJECTS_UTILS) $(OBJECTS_ASM) $(STATICLIBS)
-	$(LD) $(LDFLAGS) -T kernel.ld --oformat=elf64-x86-64 -o kernel.elf $(LOADEROBJECT) $(OBJECTS) $(OBJECTS_DRIVERS) $(OBJECTS_SYS) $(OBJECTS_MM) $(OBJECTS_PROC) $(OBJECTS_UTILS) $(OBJECTS_ASM) $(STATICLIBS)
+$(KERNEL): $(LOADEROBJECT) $(OBJECTS) $(OBJECTS_DRIVERS) $(OBJECTS_SYSCALLS) $(OBJECTS_IPC) $(OBJECTS_MM) $(OBJECTS_PROC) $(OBJECTS_UTILS) $(STATICLIBS) $(OBJECTS_ASM)
+	$(LD) $(LDFLAGS) -T kernel.ld -o $(KERNEL) $(LOADEROBJECT) $(OBJECTS) $(OBJECTS_DRIVERS) $(OBJECTS_SYSCALLS) $(OBJECTS_IPC) $(OBJECTS_MM) $(OBJECTS_PROC) $(OBJECTS_UTILS) $(OBJECTS_ASM) $(STATICLIBS)
+	$(LD) $(LDFLAGS) -T kernel.ld --oformat=elf64-x86-64 -o kernel.elf $(LOADEROBJECT) $(OBJECTS) $(OBJECTS_DRIVERS) $(OBJECTS_SYSCALLS) $(OBJECTS_IPC) $(OBJECTS_MM) $(OBJECTS_PROC) $(OBJECTS_UTILS) $(OBJECTS_ASM) $(STATICLIBS)
 
 %.o: %.c
-	$(GCC) $(GCCFLAGS) -I./include -I./drivers -I./sys -I./mm -I./proc -I./utils -c $< -o $@
+	$(GCC) $(GCCFLAGS) -I./include -I./drivers -I./sys/syscalls -I./mm -I./proc -I./utils -c $< -o $@
 
 %.o : %.asm
 	$(ASM) $(ASMFLAGS) $< -o $@
@@ -50,6 +52,6 @@ $(LOADEROBJECT):
 	$(ASM) $(ASMFLAGS) $(LOADERSRC) -o $(LOADEROBJECT)
 
 clean:
-	rm -rf asm/*.o *.o *.bin drivers/*.o sys/*.o mm/*.o proc/*.o utils/*.o
+	rm -rf asm/*.o *.o *.bin drivers/*.o sys/syscalls/*.o ipc/*.o mm/*.o proc/*.o utils/*.o
 
 .PHONY: all clean
