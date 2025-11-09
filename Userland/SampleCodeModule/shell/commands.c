@@ -461,7 +461,6 @@ const TShellCmd shellCmds[] = {
     {"exit", exitCmd, ": Salir del shell\n", 1},                                // built-in
     {"set-user", setUserCmd, ": Setea el nombre de usuario, con un maximo de 10 caracteres\n", 1},  // built-in
     {"clear", clearCmd, ": Limpia la pantalla\n", 1},                           // built-in
-    {"time", timeCmd, ": Muestra la hora actual\n", 1},                         // built-in
     {"font-size", fontSizeCmd, ": Cambia el tamanio de la fuente\n", 1},       // built-in
     {"testmm", testMMCmd, ": Ejecuta el stress test de memoria. Uso: testmm <max_mem>\n", 0},       // externo
     {"test_proceses", testProcesesCmd, ": Ejecuta el stress test de procesos. Uso: test_proceses <max_proceses>\n", 0},  // externo
@@ -534,13 +533,6 @@ int setUserCmd(int argc, char *argv[]){
 
 int clearCmd(int argc, char *argv[]){
     clearScreen();
-    return OK;
-}
-
-int timeCmd(int argc, char *argv[]){
-    char time[TIME_BUFF];
-    getTime(time);
-    printf("Hora del sistema: %s\n", time);
     return OK;
 }
 

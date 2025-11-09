@@ -1,7 +1,6 @@
 #include "syscalls_lib.h"
 #include "keyboardDriver.h"
 #include "videoDriver.h"
-#include "rtc.h"
 #include <stddef.h>
 #include <lib.h>
 #include "interrupts.h"
@@ -126,12 +125,6 @@ uint64_t syscall_write(int fd, const char * buffer, int count) {
         // FD_TYPE_PIPE_READ: no se puede escribir a un pipe de lectura
         return 0;
     }
-}
-
-
-uint64_t syscall_getTime(uint64_t reg) {
-    uint8_t t = getTime((uint8_t)reg);
-    return (uint64_t)t;
 }
 
 uint64_t syscall_clearScreen() {

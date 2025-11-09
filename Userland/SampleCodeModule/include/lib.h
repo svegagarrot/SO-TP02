@@ -5,13 +5,6 @@
 #define stdin ((FILE*)0) 
 #define REGISTERS_CANT 18
 
-#define RTC_SECONDS 0x00
-#define RTC_MINUTES 0x02
-#define RTC_HOURS 0x04
-#define RTC_DAY 0x07
-#define RTC_MONTH 0x08
-#define RTC_YEAR 0x09
-
 #include <stdint.h>
 #include <stddef.h>
 #include <math.h>
@@ -72,7 +65,6 @@ void free(void *ptr);
 int memory_info(memory_info_t *info);
 int sprintf(char *str, const char *fmt, ...);
 int try_getchar(char *c);
-void getTime(char *buffer);
 void setFontScale(int scale);
 void save_registers_snapshot(uint64_t *buffer);
 void printHex64(uint64_t value);

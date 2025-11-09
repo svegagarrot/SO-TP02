@@ -8,7 +8,6 @@
 uint64_t syscall_get_regs(uint64_t *dest);
 uint64_t syscall_read(int fd, char * buffer, int count);
 uint64_t syscall_write(int fd, const char * buffer, int count);
-uint64_t syscall_getTime(uint64_t reg);
 uint64_t syscall_clearScreen();
 uint64_t syscall_sleep(int duration);
 uint64_t syscall_setFontScale(int scale);

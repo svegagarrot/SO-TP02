@@ -1,6 +1,5 @@
 GLOBAL cpuVendor
 GLOBAL getScanCode
-GLOBAL _readTime
 GLOBAL inb
 GLOBAL outb
 GLOBAL outw
@@ -35,23 +34,6 @@ getScanCode:
     xor rax, rax   
     in al, 0x60  
     ret          
-
-_readTime:
-    push rbp
-    mov rbp, rsp
-
-    push dx
-    mov dx, 0x70
-    mov al, dil
-    out dx, al
-    xor rax, rax
-    in al, 0x71
-    pop dx
-
-    mov rsp, rbp
-    pop rbp
-    ret
-    ret
 
 inb:
     push rbp

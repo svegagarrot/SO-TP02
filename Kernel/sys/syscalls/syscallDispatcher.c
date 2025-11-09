@@ -5,7 +5,6 @@ typedef uint64_t (*SyscallHandler)(uint64_t rdi, uint64_t rsi, uint64_t rdx, uin
 static SyscallHandler syscallHandlers[] = {
     (SyscallHandler)syscall_read,   
     (SyscallHandler)syscall_write,  
-    (SyscallHandler)syscall_getTime,
     (SyscallHandler)syscall_clearScreen, 
     (SyscallHandler)syscall_sleep,
     (SyscallHandler)syscall_setFontScale,

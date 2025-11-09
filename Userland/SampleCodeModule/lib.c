@@ -512,23 +512,6 @@ void clearScreen() {
     sys_clearScreen();
 }
 
-static uint8_t getReg(uint8_t reg) {
-    return sys_getTime(reg);
-}
-
-void getTime(char *buffer) {
-    uint8_t s = getReg(RTC_SECONDS);
-    uint8_t m = getReg(RTC_MINUTES);
-    uint8_t h = getReg(RTC_HOURS);
-
-    buffer[0] = '0' + h/10; buffer[1] = '0' + h%10;
-    buffer[2] = ':';
-    buffer[3] = '0' + m/10; buffer[4] = '0' + m%10;
-    buffer[5] = ':';
-    buffer[6] = '0' + s/10; buffer[7] = '0' + s%10;
-    buffer[8] = '\0';
-}
-
 int current_font_scale = 1;
 
 void setFontScale(int scale) {

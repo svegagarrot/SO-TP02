@@ -22,7 +22,6 @@ int helpCmd(int argc, char *argv[]);
 int exitCmd(int argc, char *argv[]);
 int setUserCmd(int argc, char *argv[]);
 int clearCmd(int argc, char *argv[]);
-int timeCmd(int argc, char *argv[]);
 int fontSizeCmd(int argc, char *argv[]);
 int testMMCmd(int argc, char *argv[]);
 int testProcesesCmd(int argc, char *argv[]);
