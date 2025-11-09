@@ -77,8 +77,6 @@ void setFontScale(int scale);
 void save_registers_snapshot(uint64_t *buffer);
 void printHex64(uint64_t value);
 void sleep(int milliseconds);
-void beep(int frequency, int duration);
-void audiobounce();
 int get_regs(uint64_t *r);
 void clear_key_buffer();
 char *toLower(char *str);

@@ -10,7 +10,6 @@ uint64_t syscall_read(int fd, char * buffer, int count);
 uint64_t syscall_write(int fd, const char * buffer, int count);
 uint64_t syscall_getTime(uint64_t reg);
 uint64_t syscall_clearScreen();
-uint64_t syscall_beep(int frequency, int duration);
 uint64_t syscall_sleep(int duration);
 uint64_t syscall_setFontScale(int scale);
 uint64_t syscall_video_putChar(uint64_t c, uint64_t fg, uint64_t bg, uint64_t unused1, uint64_t unused2);

@@ -60,9 +60,6 @@ void readLine(char *buf, int maxLen) {
                 len--;
                 putchar('\b'); putchar(' '); putchar('\b');
             }
-            else{
-                sys_beep(500, 100);
-            }
         } else if (len < maxLen-1) {
             buf[len++] = (char)c;
             putchar(c);

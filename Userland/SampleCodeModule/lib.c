@@ -556,10 +556,6 @@ void sleep(int ms) {
     sys_sleep(ms);
 }
 
-void beep(int frequency, int duration) {
-    sys_beep(frequency, duration);
-}
-
 void clear_key_buffer() {
 }
 

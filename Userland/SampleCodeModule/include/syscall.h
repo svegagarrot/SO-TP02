@@ -9,7 +9,6 @@ uint64_t sys_getTime(uint8_t reg);
 uint64_t sys_clearScreen();
 uint64_t sys_setFontScale(int scale);
 uint64_t sys_sleep(int duration);
-uint64_t sys_beep(int frequency, int duration);
 uint64_t sys_video_putChar(char c, uint32_t fg, uint32_t bg);
 uint64_t sys_regs(void *user_buf);
 uint64_t sys_shutdown();
