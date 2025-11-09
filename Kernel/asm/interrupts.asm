@@ -14,8 +14,6 @@ GLOBAL _irq05Handler
 GLOBAL _irq80Handler
 GLOBAL _exception0Handler
 GLOBAL _exception6Handler
-GLOBAL request_snapshot
-GLOBAL _getSnapshot
 
 GLOBAL process_start
 GLOBAL setup_process_context
@@ -137,67 +135,6 @@ _irq00Handler:
 _irq01Handler:
     pushState
 
-    cmp byte [do_snapshot], 1
-    jne .no_snapshot
-
-    mov rsi, rsp             
-    mov rdi, snapshot_buffer  
-
-    mov   rax, [rsi + 14*8]
-    mov   [rdi +  0*8], rax
-
-    mov   rax, [rsi + 13*8]
-    mov   [rdi +  1*8], rax
-
-    mov   rax, [rsi + 12*8]
-    mov   [rdi +  2*8], rax
-
-    mov   rax, [rsi + 11*8]
-    mov   [rdi +  3*8], rax
-
-    mov   rax, [rsi + 10*8]
-    mov   [rdi +  4*8], rax
-
-    mov   rax, [rsi +  9*8]
-    mov   [rdi +  5*8], rax
-
-    mov   rax, [rsi +  8*8]
-    mov   [rdi +  6*8], rax
-
-    mov   rax, [rsi +  7*8]
-    mov   [rdi +  7*8], rax
-
-    mov   rax, [rsi +  6*8]
-    mov   [rdi +  8*8], rax
-
-    mov   rax, [rsi +  5*8]
-    mov   [rdi +  9*8], rax
-
-    mov   rax, [rsi +  4*8]
-    mov   [rdi + 10*8], rax
-
-    mov   rax, [rsi +  3*8]
-    mov   [rdi + 11*8], rax
-
-    mov   rax, [rsi +  2*8]
-    mov   [rdi + 12*8], rax
-
-    mov   rax, [rsi +  1*8]
-    mov   [rdi + 13*8], rax
-
-    mov   rax, [rsi +  0*8]
-    mov   [rdi + 14*8], rax
-
-    mov rax, [rsp + 15*8]  
-    mov [snapshot_buffer + 15*8], rax   ; RIP
-    mov rax, [rsp + 18*8]  
-    mov [snapshot_buffer + 16*8], rax   ; RSP
-    mov rax, [rsp + 17*8]  
-    mov [snapshot_buffer + 17*8], rax   ; RFLAGS
-
-    mov byte [do_snapshot], 0
-
-.no_snapshot:
     mov rdi, 1 
     call irqDispatcher
 
@@ -205,10 +142,6 @@ _irq01Handler:
     out 20h, al
     popState
     iretq
-
-_getSnapshot:
-    mov rax, snapshot_buffer
-    ret
 
 ;Cascade pic never called
 _irq02Handler:
@@ -319,10 +252,6 @@ haltcpu:
 	hlt
 	ret
 
-request_snapshot:
-    mov byte [do_snapshot], 1
-    ret
-
 ; process_start: llama entry (en r8) con rdi=arg y luego marca terminado
 process_start:
     and     rsp, -16
@@ -388,8 +317,6 @@ setup_process_context:
 SECTION .bss
 	aux resq 1
 	exception_regs resq 18
-	snapshot_buffer resq 18
-	do_snapshot resb 1
 
 SECTION .rodata
 	userland equ 0x400000

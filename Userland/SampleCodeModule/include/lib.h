@@ -3,18 +3,13 @@
 
 #define BUFFER_SIZE 256
 #define stdin ((FILE*)0) 
-#define REGISTERS_CANT 18
 
 #include <stdint.h>
 #include <stddef.h>
 #include <math.h>
 
 // Definición básica de FILE para compatibilidad
-typedef struct FILE FILE; 
-
-typedef struct {
-    uint64_t rax, rbx, rcx, rdx, rbp, rdi, rsi, r8, r9, r10, r11, r12, r13, r14, r15, rip, rsp, rflags;
-} CPURegisters;
+typedef struct FILE FILE;
 
 typedef struct {
     uint64_t total_bytes;
@@ -63,10 +58,8 @@ void free(void *ptr);
 int memory_info(memory_info_t *info);
 int sprintf(char *str, const char *fmt, ...);
 int try_getchar(char *c);
-void save_registers_snapshot(uint64_t *buffer);
 void printHex64(uint64_t value);
 void sleep(int milliseconds);
-int get_regs(uint64_t *r);
 void clear_key_buffer();
 char *toLower(char *str);
 void shutdown();

@@ -26,7 +26,6 @@ int exitCmd(int argc, char *argv[]);
 int setUserCmd(int argc, char *argv[]);
 int clearCmd(int argc, char *argv[]);
 int exceptionCmd(int argc, char *argv[]);
-int regsCmd(int argc, char *argv[]);
 int killCmd(int argc, char *argv[]);
 int niceCmd(int argc, char *argv[]);
 int blockCmd(int argc, char *argv[]);

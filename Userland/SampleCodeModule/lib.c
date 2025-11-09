@@ -4,10 +4,6 @@
 
 static int64_t g_last_spawned_pid = -1;
 
-int get_regs(uint64_t *r) {
-    return sys_regs(r);
-}
-
 int putchar(int c) {
     char ch = (char)c;
     sys_write(1, &ch, 1);

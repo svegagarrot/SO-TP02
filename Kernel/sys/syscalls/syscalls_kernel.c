@@ -16,15 +16,6 @@
 #define STDIN 0
 #define STDOUT 1
 
-extern uint64_t * _getSnapshot();
-
-uint64_t syscall_get_regs(uint64_t *dest) {
-    const uint64_t *src = _getSnapshot();
-    for (int i = 0; i < REGISTERS_CANT; i++)
-        dest[i] = src[i];
-    return 1;
-}
-
 uint64_t syscall_read(int fd, char *buffer, int count) {
     if (buffer == NULL || count <= 0 || fd < 0 || fd >= MAX_FDS) {
         return 0;

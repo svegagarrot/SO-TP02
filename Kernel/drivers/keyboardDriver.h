@@ -20,8 +20,6 @@
 #define MAX_SCANCODE 0x58
 #define BUFFER_SIZE 256
 
-#define REGISTERS_CANT 18
-
 #define KEY_ARROW_UP     0x80
 #define KEY_ARROW_DOWN   0x81
 #define KEY_ARROW_LEFT   0x82
@@ -38,8 +36,6 @@
 #define CTRL_R_CODE 0x12
 
 extern uint8_t getScanCode();
-extern void request_snapshot();
-
 
 /* Manejador de interrupciones para el teclado, 
  * se ejecuta cuando el teclado genera una interrupcion

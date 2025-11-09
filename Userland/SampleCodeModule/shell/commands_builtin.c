@@ -5,24 +5,6 @@
 
 extern void _invalidOp();
 
-int regsCmd(int argc, char *argv[]) {
-    uint64_t snap[18];
-    get_regs(snap); 
-
-    CPURegisters *regs = (CPURegisters *)snap; 
-
-    printf("RAX: %llx\tRBX: %llx\n", regs->rax, regs->rbx);
-    printf("RCX: %llx\tRDX: %llx\n", regs->rcx, regs->rdx);
-    printf("RSI: %llx\tRDI: %llx\n", regs->rsi, regs->rdi);
-    printf("RBP: %llx\tR8 : %llx\n", regs->rbp, regs->r8);
-    printf("R9 : %llx\tR10: %llx\n", regs->r9, regs->r10);
-    printf("R11: %llx\tR12: %llx\n", regs->r11, regs->r12);
-    printf("R13: %llx\tR14: %llx\n", regs->r13, regs->r14);
-    printf("R15: %llx\tRIP: %llx\n", regs->r15, regs->rip);
-    printf("RSP: %llx\tRFLAGS: %llx\n", regs->rsp, regs->rflags);
-    return OK;
-}
-
 int helpCmd(int argc, char *argv[]){
     printf("%s", "Comandos disponibles:\n");
     for(int i = 1; shellCmds[i].name; i++){

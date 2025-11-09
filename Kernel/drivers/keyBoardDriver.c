@@ -56,9 +56,7 @@ void keyboard_interrupt_handler() {
 
     char cAscii = scToAscii(scancode);        
 
-    if (activeCtrl && (cAscii == 'r' || cAscii == 'R')) {
-        request_snapshot();
-    } else if (activeCtrl && (cAscii == 'c' || cAscii == 'C')) {
+    if (activeCtrl && (cAscii == 'c' || cAscii == 'C')) {
         uint64_t fg_pid = scheduler_get_foreground_pid();
         if (fg_pid != 0) {
             scheduler_kill_by_pid(fg_pid);

@@ -16,7 +16,6 @@ const TShellCmd shellCmds[] = {
     {"test_no_synchro", testNoSynchroCmd, ": Ejecuta test sin sincronizacion. Uso: test_no_synchro <repeticiones>\n", 0},
     {"test_priority", testPriorityCmd, ": Ejecuta el test de prioridades. Uso: test_priority <max_value>\n", 0},
     {"exceptions", exceptionCmd, ": Testear excepciones. Ingrese: exceptions [zero/invalidOpcode] para testear alguna operacion\n", 1},
-    {"regs", regsCmd, ": Muestra los ultimos 18 registros de la CPU\n", 1},
     {"mmtype", mmTypeCmd, ": Muestra el tipo de memory manager activo\n", 0},
     {"ps", psCmd, ": Lista todos los procesos con sus propiedades\n", 0},
     {"loop", loopCmd, ": Crea un proceso que imprime su ID con saludo cada X segundos. Uso: loop <segundos>\n", 0},

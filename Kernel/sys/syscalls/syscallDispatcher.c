@@ -8,7 +8,6 @@ static SyscallHandler syscallHandlers[] = {
     (SyscallHandler)syscall_clearScreen, 
     (SyscallHandler)syscall_sleep,
     (SyscallHandler)syscall_video_putChar,
-    (SyscallHandler)syscall_get_regs,
     (SyscallHandler)syscall_shutdown,
     (SyscallHandler)syscall_get_screen_dimensions,
     (SyscallHandler)syscall_malloc,
