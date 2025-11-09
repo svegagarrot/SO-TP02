@@ -1,0 +1,73 @@
+name: PVS-Studio Static Analysis
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  pvs-analysis:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential nasm qemu-system-x86
+        
+    - name: Install PVS-Studio
+      run: |
+        # Add PVS-Studio repository (using modern method)
+        wget -q -O - https://files.pvs-studio.com/etc/pubkey.txt | \
+          gpg --dearmor | sudo tee /usr/share/keyrings/pvs-studio.gpg > /dev/null
+        echo "deb [signed-by=/usr/share/keyrings/pvs-studio.gpg] https://files.pvs-studio.com/deb viva64-release pvs-studio" | \
+          sudo tee /etc/apt/sources.list.d/viva64.list
+        
+        # Install PVS-Studio
+        sudo apt-get update
+        sudo apt-get install -y pvs-studio
+        
+        # Create a comment file for open-source projects (no registration needed)
+        # This allows PVS-Studio to run in analysis mode for open-source projects
+        echo "// This is an open source project. PVS-Studio, please check it." > /tmp/pvs-comment.txt
+        echo "// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com" >> /tmp/pvs-comment.txt
+        
+    - name: Run PVS-Studio analysis
+      run: |
+        # For open-source projects, use the comment-based licensing
+        # Add the comment to all C/C++ files (temporary, just for analysis)
+        # Instead, we'll modify the script to add --lic-file parameter
+        PVS_COMMENT="/tmp/pvs-comment.txt" make pvs
+      continue-on-error: true
+      id: pvs
+      env:
+        PVS_USERNAME: "PVS-Studio"
+        PVS_KEY: "FREE-FREE-FREE-FREE"
+      
+    - name: Upload PVS-Studio report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: pvs-studio-report
+        path: pvs-report/
+        retention-days: 30
+        
+    - name: Upload PVS-Studio log
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: pvs-studio-log
+        path: pvs.log
+        retention-days: 30
+        
+    - name: Check for high-severity issues
+      run: |
+        if [ "${{ steps.pvs.outcome }}" = "failure" ]; then
+          echo "❌ PVS-Studio found high-severity issues!"
+          echo "Download the artifact to review the full report."
+          exit 1
+        fi
