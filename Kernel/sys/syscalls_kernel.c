@@ -170,28 +170,9 @@ uint64_t syscall_setFontScale(int scale) {
     return 1; 
 }
 
-uint64_t syscall_video_putPixel(uint64_t x, uint64_t y, uint64_t color, uint64_t unused1, uint64_t unused2) {
-    video_putPixel((uint32_t)color, x, y);
-    return 0;
-}
-
 uint64_t syscall_video_putChar(uint64_t c, uint64_t fg, uint64_t bg, uint64_t unused1, uint64_t unused2) {
     video_putChar((char)c, fg, bg);
     return 0;
-}
-
-uint64_t syscall_video_clearScreenColor(uint64_t color, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
-    video_clearScreenColor((uint32_t)color);
-    return 0;
-}
-
-uint64_t syscall_video_putCharXY(uint64_t c, uint64_t x, uint64_t y, uint64_t fg, uint64_t bg) {
-    video_putCharXY((char)c, (int)x, (int)y, (uint32_t)fg, (uint32_t)bg);
-    return 0;
-}
-
-uint64_t syscall_is_key_pressed(uint64_t scancode) {
-    return (uint64_t)is_key_pressed((uint8_t)scancode);
 }
 
 uint64_t syscall_shutdown(uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4, uint64_t unused5) {

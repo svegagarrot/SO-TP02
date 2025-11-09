@@ -10,12 +10,8 @@ uint64_t sys_clearScreen();
 uint64_t sys_setFontScale(int scale);
 uint64_t sys_sleep(int duration);
 uint64_t sys_beep(int frequency, int duration);
-uint64_t sys_video_putPixel(int x, int y, uint32_t color);
 uint64_t sys_video_putChar(char c, uint32_t fg, uint32_t bg);
-uint64_t sys_video_clearScreenColor(uint32_t color);
-uint64_t sys_video_putCharXY(char c, int x, int y, uint32_t fg, uint32_t bg);
 uint64_t sys_regs(void *user_buf);
-uint64_t sys_is_key_pressed(unsigned char scancode);
 uint64_t sys_shutdown();
 int sys_screenDims(uint64_t *width, uint64_t *height);
 

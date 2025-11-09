@@ -2,7 +2,6 @@
 #include "../include/lib.h"
 #include "../include/shell.h"
 #include "../include/syscall.h"
-#include "../include/game.h"
 
 int g_run_in_background = 0;
 
@@ -222,27 +221,6 @@ static void filter_process_entry(void *arg) {
         }
     }
 }
-
-// Wrapper para echo que imprime sus argumentos
-static void echo_process_entry(void *arg) {
-    char **argv = (char **)arg;
-    
-    if (argv != NULL && argv[0] != NULL) {
-        int i = 0;
-        while (argv[i] != NULL) {
-            printf("%s", argv[i]);
-            if (argv[i + 1] != NULL) {
-                printf(" ");
-            }
-            free(argv[i]);
-            i++;
-        }
-        printf("\n");
-        free(argv);
-    }
-}
-
-
 
 // Wrapper para escritores
 static void mvar_writer_entry(void *arg) {
@@ -491,7 +469,6 @@ const TShellCmd shellCmds[] = {
     {"test_no_synchro", testNoSynchroCmd, ": Ejecuta test sin sincronizacion. Uso: test_no_synchro <repeticiones>\n", 0},  // externo
     {"test_priority", testPriorityCmd, ": Ejecuta el test de prioridades. Uso: test_priority <max_value>\n", 0},  // externo
     {"exceptions", exceptionCmd, ": Testear excepciones. Ingrese: exceptions [zero/invalidOpcode] para testear alguna operacion\n", 1},  // built-in
-    {"jugar", gameCmd, ": Inicia el modo juego\n", 1},                          // built-in
     {"regs", regsCmd, ": Muestra los ultimos 18 registros de la CPU\n", 1},    // built-in
     {"mmtype", mmTypeCmd, ": Muestra el tipo de memory manager activo\n", 0},  // externo
     {"ps", psCmd, ": Lista todos los procesos con sus propiedades\n", 0},       // externo
@@ -502,7 +479,6 @@ const TShellCmd shellCmds[] = {
     {"mem", memCmd, ": Imprime el estado de la memoria\n", 0},                  // externo
     {"cat", catCmd, ": Imprime el stdin tal como lo recibe\n", 0},             // externo
     {"wc", wcCmd, ": Cuenta la cantidad de lineas del input\n", 0},            // externo
-    {"echo", echoCmd, ": Imprime argumentos. Uso: echo <texto>\n", 0},         // externo
     {"filter", filterCmd, ": Filtra las vocales del input\n", 0},              // externo
     {"mvar", mvarCmd, ": Simula MVar con lectores/escritores. Uso: mvar <escritores> <lectores>\n", 0},  // externo
     {NULL, NULL, NULL, 0}, 
@@ -621,7 +597,6 @@ static void *get_process_entry_function(int cmd_idx) {
     // Mapear nombre del comando a su función de entrada
     if (strcmp(name, "cat") == 0) return (void *)cat_process_entry;
     if (strcmp(name, "wc") == 0) return (void *)wc_process_entry;
-    if (strcmp(name, "echo") == 0) return (void *)echo_process_entry;
     if (strcmp(name, "filter") == 0) return (void *)filter_process_entry;
     if (strcmp(name, "ps") == 0) return (void *)ps_process_entry;
     if (strcmp(name, "loop") == 0) return (void *)loop_process_entry;
@@ -1138,11 +1113,6 @@ int testProcesesCmd(int argc, char *argv[]) {
     return OK;
 }
 
-int gameCmd(int argc, char *argv[]) {
-    game_main_screen();
-    return OK;
-}
-
 int mmTypeCmd(int argc, char *argv[]) {
     extern int g_run_in_background;
     
@@ -1432,58 +1402,6 @@ int wcCmd(int argc, char *argv[]) {
     
     if (pid <= 0) {
         printf("Error: no se pudo crear el proceso wc.\n");
-        return CMD_ERROR;
-    }
-    
-    return OK;
-}
-
-// echo: Imprime sus argumentos
-int echoCmd(int argc, char *argv[]) {
-    extern int g_run_in_background;
-    
-    if (argc < 2) {
-        printf("\n");
-        return OK;
-    }
-    
-    // Copiar argumentos para pasarlos al proceso
-    char **process_argv = (char **)malloc((argc) * sizeof(char *));
-    if (process_argv == NULL) {
-        printf("Error: no se pudo asignar memoria.\n");
-        return CMD_ERROR;
-    }
-    
-    for (int i = 1; i < argc; i++) {
-        int len = 0;
-        while (argv[i][len] != '\0') len++;
-        
-        process_argv[i-1] = (char *)malloc(len + 1);
-        if (process_argv[i-1] == NULL) {
-            for (int j = 0; j < i-1; j++) free(process_argv[j]);
-            free(process_argv);
-            printf("Error: no se pudo asignar memoria.\n");
-            return CMD_ERROR;
-        }
-        
-        for (int j = 0; j < len; j++) {
-            process_argv[i-1][j] = argv[i][j];
-        }
-        process_argv[i-1][len] = '\0';
-    }
-    process_argv[argc-1] = NULL;
-    
-    int is_foreground = g_run_in_background ? 0 : 1;
-    int64_t pid = execute_external_command("echo", echo_process_entry, process_argv, is_foreground, 0, 0);
-    
-    // Liberar argumentos copiados (execute_external_command ya esperó si es foreground)
-    for (int i = 0; process_argv[i] != NULL; i++) {
-        free(process_argv[i]);
-    }
-    free(process_argv);
-    
-    if (pid <= 0) {
-        printf("Error: no se pudo crear el proceso echo.\n");
         return CMD_ERROR;
     }
     

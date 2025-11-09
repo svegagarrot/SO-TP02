@@ -32,7 +32,6 @@ int testNoSynchroCmd(int argc, char *argv[]);
 int fillCommandAndArgs(char *args[], char *input);  
 int CommandParse(char *commandInput);
 int exceptionCmd(int argc, char *argv[]);
-int gameCmd(int argc, char *argv[]);
 int regsCmd(int argc, char *argv[]);
 int set_some_regs();
 int psCmd(int argc, char *argv[]);

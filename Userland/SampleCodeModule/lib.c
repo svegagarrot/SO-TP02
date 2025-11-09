@@ -25,10 +25,6 @@ int getchar(void) {
     return (int)c;
 }
 
-int is_key_pressed_syscall(unsigned char scancode) {
-    return sys_is_key_pressed(scancode);
-}
-
 size_t strlen(const char *s) {
     size_t len = 0;
     while (s[len] != '\0') {
@@ -551,18 +547,6 @@ void printHex64(uint64_t value) {
     printf("0x%s", hex);
 }
 
-void video_putPixel(int x, int y, uint32_t color) {
-    sys_video_putPixel(x, y, color);
-}
-
-void video_putChar(char c, uint32_t fg, uint32_t bg) {
-    sys_video_putChar(c, fg, bg);
-}
-
-void video_clearScreenColor(uint32_t color) {
-    sys_video_clearScreenColor(color);
-}
-
 int try_getchar(char *c) {
     (void)c;
     return 0;
@@ -570,10 +554,6 @@ int try_getchar(char *c) {
 
 void sleep(int ms) {
     sys_sleep(ms);
-}
-
-void video_putCharXY(int x, int y, char c, uint32_t fg, uint32_t bg) {
-    sys_video_putCharXY(c, x, y, fg, bg);
 }
 
 void beep(int frequency, int duration) {

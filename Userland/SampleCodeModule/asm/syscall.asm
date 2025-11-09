@@ -7,12 +7,8 @@ GLOBAL sys_clearScreen
 GLOBAL sys_beep
 GLOBAL sys_sleep
 GLOBAL sys_setFontScale
-GLOBAL sys_video_putPixel
 GLOBAL sys_video_putChar
-GLOBAL sys_video_clearScreenColor
-GLOBAL sys_video_putCharXY
 GLOBAL sys_regs
-GLOBAL sys_is_key_pressed
 GLOBAL sys_shutdown
 GLOBAL sys_screenDims
 GLOBAL sys_malloc
@@ -106,37 +102,10 @@ sys_setFontScale:
     pop rbp
     ret
 
-sys_video_clearScreenColor:
-    push rbp
-    mov rbp, rsp
-    mov rax, 7       
-    int 0x80
-    mov rsp, rbp
-    pop rbp
-    ret
-
-sys_video_putPixel:
-    push rbp
-    mov rbp, rsp
-    mov rax, 8        
-    int 0x80
-    mov rsp, rbp
-    pop rbp
-    ret
-
 sys_video_putChar:
     push rbp
     mov rbp, rsp
-    mov rax, 9       
-    int 0x80
-    mov rsp, rbp
-    pop rbp
-    ret
-
-sys_video_putCharXY:
-    push rbp
-    mov rbp, rsp
-    mov rax, 10
+    mov rax, 7
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -145,17 +114,7 @@ sys_video_putCharXY:
 sys_regs:
     push rbp
     mov rbp, rsp
-    mov rax, 11
-    int 0x80
-    mov rsp, rbp
-    pop rbp
-    ret
-
-sys_is_key_pressed:
-    push rbp
-    mov rbp, rsp
-    mov rax, 12
-    mov rdi, rdi   
+    mov rax, 8
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -164,7 +123,7 @@ sys_is_key_pressed:
 sys_shutdown:
     push rbp
     mov rbp, rsp
-    mov rax, 13    
+    mov rax, 9    
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -173,7 +132,7 @@ sys_shutdown:
 sys_screenDims:
     push rbp
     mov rbp, rsp
-    mov rax, 14    
+    mov rax, 10    
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -181,7 +140,7 @@ sys_screenDims:
 sys_malloc:
     push rbp
     mov rbp, rsp
-    mov rax, 15
+    mov rax, 11
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -190,7 +149,7 @@ sys_malloc:
 sys_free:
     push rbp
     mov rbp, rsp
-    mov rax, 16
+    mov rax, 12
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -199,7 +158,7 @@ sys_free:
 sys_meminfo:
     push rbp
     mov rbp, rsp
-    mov rax, 17
+    mov rax, 13
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -208,7 +167,7 @@ sys_meminfo:
 sys_create_process:
     push rbp
     mov rbp, rsp
-    mov rax, 18
+    mov rax, 14
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -217,7 +176,7 @@ sys_create_process:
 sys_kill:
     push rbp
     mov rbp, rsp
-    mov rax, 19
+    mov rax, 15
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -226,7 +185,7 @@ sys_kill:
 sys_block:
     push rbp
     mov rbp, rsp
-    mov rax, 20
+    mov rax, 16
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -235,7 +194,7 @@ sys_block:
 sys_unblock:
     push rbp
     mov rbp, rsp
-    mov rax, 21
+    mov rax, 17
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -244,7 +203,7 @@ sys_unblock:
 sys_get_type_of_mm:
     push rbp
     mov rbp, rsp
-    mov rax, 22
+    mov rax, 18
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -253,7 +212,7 @@ sys_get_type_of_mm:
 sys_getpid:
     push rbp
     mov rbp, rsp
-    mov rax, 23
+    mov rax, 19
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -262,7 +221,7 @@ sys_getpid:
 sys_set_priority:
     push rbp
     mov rbp, rsp
-    mov rax, 24
+    mov rax, 20
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -271,7 +230,7 @@ sys_set_priority:
 sys_wait:
     push rbp
     mov rbp, rsp
-    mov rax, 25
+    mov rax, 21
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -280,7 +239,7 @@ sys_wait:
 sys_sem_create:
     push rbp
     mov rbp, rsp
-    mov rax, 26
+    mov rax, 22
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -289,7 +248,7 @@ sys_sem_create:
 sys_sem_open:
     push rbp
     mov rbp, rsp
-    mov rax, 27
+    mov rax, 23
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -298,7 +257,7 @@ sys_sem_open:
 sys_sem_close:
     push rbp
     mov rbp, rsp
-    mov rax, 28
+    mov rax, 24
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -307,7 +266,7 @@ sys_sem_close:
 sys_sem_wait:
     push rbp
     mov rbp, rsp
-    mov rax, 29
+    mov rax, 25
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -316,7 +275,7 @@ sys_sem_wait:
 sys_sem_signal:
     push rbp
     mov rbp, rsp
-    mov rax, 30
+    mov rax, 26
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -325,7 +284,7 @@ sys_sem_signal:
 sys_sem_set:
     push rbp
     mov rbp, rsp
-    mov rax, 31
+    mov rax, 27
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -334,7 +293,7 @@ sys_sem_set:
 sys_sem_get:
     push rbp
     mov rbp, rsp
-    mov rax, 32
+    mov rax, 28
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -343,7 +302,7 @@ sys_sem_get:
 sys_list_processes:
     push rbp
     mov rbp, rsp
-    mov rax, 33
+    mov rax, 29
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -352,7 +311,7 @@ sys_list_processes:
 sys_yield:
     push rbp
     mov rbp, rsp
-    mov rax, 34
+    mov rax, 30
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -361,7 +320,7 @@ sys_yield:
 sys_pipe_create:
     push rbp
     mov rbp, rsp
-    mov rax, 35
+    mov rax, 31
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -370,7 +329,7 @@ sys_pipe_create:
 sys_pipe_open:
     push rbp
     mov rbp, rsp
-    mov rax, 36
+    mov rax, 32
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -379,7 +338,7 @@ sys_pipe_open:
 sys_pipe_close:
     push rbp
     mov rbp, rsp
-    mov rax, 37
+    mov rax, 33
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -388,7 +347,7 @@ sys_pipe_close:
 sys_pipe_dup:
     push rbp
     mov rbp, rsp
-    mov rax, 38
+    mov rax, 34
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -397,7 +356,7 @@ sys_pipe_dup:
 sys_pipe_release_fd:
     push rbp
     mov rbp, rsp
-    mov rax, 39
+    mov rax, 35
     int 0x80
     mov rsp, rbp
     pop rbp
@@ -406,7 +365,7 @@ sys_pipe_release_fd:
 sys_get_foreground_pid:
     push rbp
     mov rbp, rsp
-    mov rax, 40
+    mov rax, 36
     int 0x80
     mov rsp, rbp
     pop rbp
