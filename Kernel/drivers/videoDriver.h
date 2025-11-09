@@ -27,7 +27,6 @@ void video_moveCursorRight();
 void video_moveCursorUp();
 void video_moveCursorDown();
 void video_drawCursor(uint64_t color);
-void setFontScale(uint64_t scale);
 void video_printError(const char *errorMsg);
 void video_clearScreenColor(uint32_t color);
 void video_putCharXY(char c, int x, int y, uint32_t fg, uint32_t bg);

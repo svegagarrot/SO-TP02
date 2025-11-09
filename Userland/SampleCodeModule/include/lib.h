@@ -46,8 +46,6 @@ typedef struct {
     int foreground;
 } process_info_t;
 
-extern int current_font_scale;
-
 int putchar(int c);
 int getchar(void);
 int scanf(const char *fmt, ...);
@@ -65,7 +63,6 @@ void free(void *ptr);
 int memory_info(memory_info_t *info);
 int sprintf(char *str, const char *fmt, ...);
 int try_getchar(char *c);
-void setFontScale(int scale);
 void save_registers_snapshot(uint64_t *buffer);
 void printHex64(uint64_t value);
 void sleep(int milliseconds);

@@ -146,15 +146,6 @@ uint64_t syscall_sleep(int duration) {
     return 0;
 }
 
-uint64_t syscall_setFontScale(int scale) {
-    if (scale < 1 || scale > 5) {
-        return 0; 
-    }
-    
-    setFontScale(scale);
-    return 1; 
-}
-
 uint64_t syscall_video_putChar(uint64_t c, uint64_t fg, uint64_t bg, uint64_t unused1, uint64_t unused2) {
     video_putChar((char)c, fg, bg);
     return 0;

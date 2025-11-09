@@ -512,13 +512,6 @@ void clearScreen() {
     sys_clearScreen();
 }
 
-int current_font_scale = 1;
-
-void setFontScale(int scale) {
-    current_font_scale = scale; 
-    sys_setFontScale(scale);
-}
-
 void printHex64(uint64_t value) {
     char hex[17];
     for (int i = 15; i >= 0; i--) {

@@ -461,7 +461,6 @@ const TShellCmd shellCmds[] = {
     {"exit", exitCmd, ": Salir del shell\n", 1},                                // built-in
     {"set-user", setUserCmd, ": Setea el nombre de usuario, con un maximo de 10 caracteres\n", 1},  // built-in
     {"clear", clearCmd, ": Limpia la pantalla\n", 1},                           // built-in
-    {"font-size", fontSizeCmd, ": Cambia el tamanio de la fuente\n", 1},       // built-in
     {"testmm", testMMCmd, ": Ejecuta el stress test de memoria. Uso: testmm <max_mem>\n", 0},       // externo
     {"test_proceses", testProcesesCmd, ": Ejecuta el stress test de procesos. Uso: test_proceses <max_proceses>\n", 0},  // externo
     {"test_synchro", testSyncCmd, ": Ejecuta test sincronizado con semaforos. Uso: test_synchro <repeticiones>\n", 0},  // externo
@@ -533,25 +532,6 @@ int setUserCmd(int argc, char *argv[]){
 
 int clearCmd(int argc, char *argv[]){
     clearScreen();
-    return OK;
-}
-
-int fontSizeCmd(int argc, char *argv[]){
-    char input[10];
-    int size;
-    
-    printf("Ingrese el nuevo tamanio de la fuente (1-3): ");
-    readLine(input, sizeof(input));
-    size = atoi(input);
-    
-    if(size < 1 || size > 3){
-        printf("Tamanio invalido. Debe estar entre 1 y 3.\n");
-        return CMD_ERROR;
-    }
-    
-    setFontScale(size);
-    clearScreen();
-    printf("Tamanio de fuente cambiado a: %d\n", size);
     return OK;
 }
 

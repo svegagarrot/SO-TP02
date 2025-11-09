@@ -57,20 +57,6 @@ void video_putPixel(uint32_t color, uint64_t x, uint64_t y) {
     framebuffer[offset+2]   = (color >> 16) & 0xFF;
 }
 
-void setFontScale(uint64_t scale) {
-    if (scale < 1) scale = 1; 
-    fontScale = scale;
-
-    if (cursorX >= VBEModeInfo->width) {
-        cursorX = 0;
-        cursorY += FONT_HEIGHT * fontScale;
-    }
-    if (cursorY >= VBEModeInfo->height) {
-        video_scrollUp();
-        cursorY = VBEModeInfo->height - (FONT_HEIGHT * fontScale);
-    }
-}
-
 void video_putChar(char c, uint64_t foregroundColor, uint64_t backgroundColor) {
 
     if (isSpecialChar(c)) {
