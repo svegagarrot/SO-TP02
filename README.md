@@ -59,25 +59,15 @@ Este proyecto incluye integración completa con **PVS-Studio** para análisis es
 Instalar PVS-Studio:
 
 ```bash
-# Linux (Debian/Ubuntu) - Método moderno
-wget -q -O - https://files.pvs-studio.com/etc/pubkey.txt | \
-  gpg --dearmor | sudo tee /usr/share/keyrings/pvs-studio.gpg > /dev/null
-
-echo "deb [signed-by=/usr/share/keyrings/pvs-studio.gpg] https://files.pvs-studio.com/deb viva64-release pvs-studio" | \
-  sudo tee /etc/apt/sources.list.d/viva64.list
-
+# Linux (Debian/Ubuntu)
+wget -q -O - https://files.pvs-studio.com/etc/pubkey.txt | sudo apt-key add -
+sudo wget -O /etc/apt/sources.list.d/viva64.list https://files.pvs-studio.com/etc/viva64.list
 sudo apt-get update
 sudo apt-get install pvs-studio
 
-# Para proyectos open-source: crear archivo de comentarios
-echo "// This is an open source project. PVS-Studio, please check it." > pvs-comment.txt
-echo "// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com" >> pvs-comment.txt
-
-# Exportar variable de entorno
-export PVS_COMMENT="$(pwd)/pvs-comment.txt"
+# Activar licencia (FREE para proyectos open source)
+pvs-studio-analyzer credentials PVS-Studio FREE FREE
 ```
-
-**Nota:** Para proyectos open-source, PVS-Studio puede usarse gratuitamente mediante el sistema de comentarios (no requiere registro).
 
 #### En Docker
 

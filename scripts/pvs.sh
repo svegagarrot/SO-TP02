@@ -48,12 +48,6 @@ if [[ -f "$SUPPRESS_FILE" ]]; then
     ANALYZE_ARGS+=("-S" "$SUPPRESS_FILE")
 fi
 
-# For open-source projects: use comment file if PVS_COMMENT env variable is set
-if [[ -n "${PVS_COMMENT:-}" ]] && [[ -f "$PVS_COMMENT" ]]; then
-    echo "    Using open-source license comment from: $PVS_COMMENT"
-    ANALYZE_ARGS+=("--lic-file" "$PVS_COMMENT")
-fi
-
 pvs-studio-analyzer analyze "${ANALYZE_ARGS[@]}"
 
 echo ""
