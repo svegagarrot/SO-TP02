@@ -1,7 +1,7 @@
-#include "process.h"
-#include "mm.h"
-#include "interrupts.h"
-#include "pipe.h"
+#include <process.h>
+#include <mm.h>
+#include <interrupts.h>
+#include <pipe.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>

@@ -1,12 +1,12 @@
 #include <lib.h>
 #include <moduleLoader.h>
-#include "keyboardDriver.h"
-#include "scheduler.h"
-#include "mm.h"
+#include <keyboardDriver.h>
+#include <scheduler.h>
+#include <mm.h>
 #include <idtLoader.h>
-#include "process.h"
-#include "interrupts.h"
-#include "pipe.h"
+#include <process.h>
+#include <interrupts.h>
+#include <pipe.h>
 
 extern uint8_t text;
 extern uint8_t rodata;

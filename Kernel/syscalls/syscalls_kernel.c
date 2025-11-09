@@ -1,17 +1,17 @@
-#include "syscalls_lib.h"
-#include "keyboardDriver.h"
-#include "videoDriver.h"
+#include <syscalls_lib.h>
+#include <keyboardDriver.h>
+#include <videoDriver.h>
 #include <stddef.h>
 #include <lib.h>
-#include "interrupts.h"
-#include "time.h"
-#include "keystate.h"
-#include "process.h"
-#include "scheduler.h"
-#include "mm.h"
+#include <interrupts.h>
+#include <time.h>
+#include <keystate.h>
+#include <process.h>
+#include <scheduler.h>
+#include <mm.h>
 #include <string.h>
-#include "semaphore.h"
-#include "pipe.h"
+#include <semaphore.h>
+#include <pipe.h>
 
 #define STDIN 0
 #define STDOUT 1

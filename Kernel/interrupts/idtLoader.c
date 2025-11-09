@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <idtLoader.h>
 #include <defs.h>
-#include "interrupts.h"
+#include <interrupts.h>
 #include <naiveConsole.h>
 
 #pragma pack(push)

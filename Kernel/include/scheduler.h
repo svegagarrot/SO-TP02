@@ -1,7 +1,7 @@
 #ifndef SCHEDULER_H
 #define SCHEDULER_H
 #include <stdint.h>
-#include "process.h"
+#include <process.h>
 
 void init_scheduler(void);
 uint64_t schedule(uint64_t current_rsp);

@@ -1,4 +1,4 @@
-#include "exceptions.h"
+#include <exceptions.h>
 
 static void video_printRegister(char *regName, uint64_t regValue);
 static void video_printRegisters(uint64_t exceptionRegisters[18]);

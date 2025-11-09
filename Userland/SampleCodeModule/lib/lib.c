@@ -1,5 +1,5 @@
-#include "include/lib.h"
-#include "include/syscall.h"
+#include "../include/lib.h"
+#include "../include/syscall.h"
 #include <stddef.h>
 
 // ============================================================================
