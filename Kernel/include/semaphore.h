@@ -2,7 +2,7 @@
 #define SEMAPHORE_H
 
 #include <stdint.h>
-#include "process.h"
+#include <process.h>
 
 typedef struct semaphore_t semaphore_t;
 

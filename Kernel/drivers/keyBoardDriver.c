@@ -1,8 +1,8 @@
-#include "keyboardDriver.h"
-#include "keystate.h"
+#include <keyboardDriver.h>
+#include <keystate.h>
 #include <naiveConsole.h>
-#include "semaphore.h"
-#include "scheduler.h"
+#include <semaphore.h>
+#include <scheduler.h>
 
 static int buffer_empty();
 static int buffer_full();

@@ -1,8 +1,8 @@
-#include "pipe.h"
-#include "semaphore.h"
-#include "process.h"
-#include "scheduler.h"
-#include "lib.h"
+#include <pipe.h>
+#include <semaphore.h>
+#include <process.h>
+#include <scheduler.h>
+#include <lib.h>
 #include <stddef.h>
 #include <string.h>
 

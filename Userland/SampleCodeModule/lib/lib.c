@@ -1,5 +1,5 @@
-#include "include/lib.h"
-#include "include/syscall.h"
+#include "../include/lib.h"
+#include "../include/syscall.h"
 #include <stdarg.h>
 
 static int64_t g_last_spawned_pid = -1;

@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "interrupts.h" 
-#include "registers.h"
+#include <interrupts.h> 
+#include <registers.h>
 
 #define ESC 0x1B
 #define BACKSPACE 0x0E

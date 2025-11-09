@@ -1,8 +1,8 @@
-#include "scheduler.h"
-#include "process.h"
-#include "time.h"
-#include "interrupts.h"
-#include "keyboardDriver.h"
+#include <scheduler.h>
+#include <process.h>
+#include <time.h>
+#include <interrupts.h>
+#include <keyboardDriver.h>
 #include <naiveConsole.h>
 #include <stddef.h>
 #include <stdbool.h>

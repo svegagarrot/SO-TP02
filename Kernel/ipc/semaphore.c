@@ -1,8 +1,8 @@
-#include "semaphore.h"
-#include "process.h"
-#include "scheduler.h"
-#include "interrupts.h"
-#include "lib.h"
+#include <semaphore.h>
+#include <process.h>
+#include <scheduler.h>
+#include <interrupts.h>
+#include <lib.h>
 #include <naiveConsole.h>
 #include <stddef.h>
 
