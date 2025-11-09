@@ -282,7 +282,8 @@ uint64_t syscall_wait(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t
     }
 
     process_t *me = scheduler_current_process();
-    if (!me || me == target || me == NULL) return 0;
+    // me == NULL es redundante porque ya se verificó !me
+    if (!me || me == target) return 0;
     
     me->waiting_on_pid = pid;
     me->waiter_next = target->waiters_head;
@@ -396,7 +397,8 @@ uint64_t syscall_pipe_close(uint64_t pipe_id, uint64_t unused1, uint64_t unused2
 // fd: file descriptor donde asignar el pipe
 // mode: 0 para lectura, 1 para escritura
 uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t unused1, uint64_t unused2) {
-    if (fd < 0 || fd >= MAX_FDS) {
+    // fd es uint64_t, por lo que fd < 0 siempre es falso
+    if (fd >= MAX_FDS) {
         return 0;
     }
     
@@ -452,7 +454,8 @@ uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t
 }
 
 uint64_t syscall_pipe_release_fd(uint64_t fd, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
-    if (fd < 0 || fd >= MAX_FDS) {
+    // fd es uint64_t, por lo que fd < 0 siempre es falso
+    if (fd >= MAX_FDS) {
         return 0;
     }
 

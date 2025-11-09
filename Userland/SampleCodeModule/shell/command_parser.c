@@ -180,9 +180,8 @@ static int execute_pipeline(char *left_input, char *right_input) {
         } else {
             printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[right_idx].name);
             // Limpiar proceso izquierdo si falló el derecho
-            if (left_pid > 0) {
-                my_kill(left_pid);
-            }
+            // left_pid > 0 siempre es verdadero aquí porque estamos dentro del bloque if (left_pid > 0)
+            my_kill(left_pid);
         }
     } else {
         printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[left_idx].name);

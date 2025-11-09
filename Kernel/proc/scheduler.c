@@ -27,7 +27,8 @@ static inline void sched_crit_enter(void) { _cli(); }
 static inline void sched_crit_exit(void)  { _sti(); }
 
 static inline uint8_t clamp_priority(uint8_t pr) {
-    if (pr < PROCESS_PRIORITY_MIN) return PROCESS_PRIORITY_MIN;
+    // pr es uint8_t, por lo que pr < PROCESS_PRIORITY_MIN (0) siempre es falso
+    // Se elimina la verificación redundante
     if (pr > PROCESS_PRIORITY_MAX) return PROCESS_PRIORITY_MAX;
     return pr;
 }
@@ -135,6 +136,7 @@ uint64_t schedule(uint64_t current_rsp) {
     apply_aging();
 
     bool quantum_expired = (now - last_switch_tick) >= QUANTUM_TICKS;
+    // current ya fue verificado como no-NULL en línea 130
     bool must_switch = (current->state != PROCESS_STATE_RUNNING);
 
     process_t *peek = NULL;
@@ -144,11 +146,15 @@ uint64_t schedule(uint64_t current_rsp) {
             break;
         }
     }
-    bool higher_pr_ready = peek && (!current || peek->priority > current->priority);
+    // current ya fue verificado como no-NULL, la verificación !current es redundante pero segura
+    bool higher_pr_ready = peek && peek->priority > current->priority;
 
     must_switch = must_switch || higher_pr_ready || quantum_expired || need_resched;
 
-    if (!must_switch && current->state == PROCESS_STATE_RUNNING) {
+    // Si no hay necesidad de cambiar y current está RUNNING, continuar con el mismo proceso
+    // La verificación current->state == PROCESS_STATE_RUNNING es redundante aquí porque
+    // si !must_switch, entonces current->state debe ser RUNNING (por la lógica anterior)
+    if (!must_switch) {
         return current_rsp;
     }
 

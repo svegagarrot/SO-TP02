@@ -16,7 +16,11 @@ static uint64_t next_pid = 1;
 static void copy_name(process_t *p, const char *name) {
     const char *src = (name ? name : "proc");
     size_t i = 0;
-    for (; i < PROCESS_NAME_MAX_LEN && src[i]; ++i) p->name[i] = src[i];
+    // Copiar hasta PROCESS_NAME_MAX_LEN caracteres (índices 0 a PROCESS_NAME_MAX_LEN-1)
+    for (; i < PROCESS_NAME_MAX_LEN && src[i]; ++i) {
+        p->name[i] = src[i];
+    }
+    // Asegurar que el string termina en null (índice i está garantizado <= PROCESS_NAME_MAX_LEN)
     p->name[i] = '\0';
 }
 
@@ -124,7 +128,7 @@ process_t *process_create(const char *name,
     if (parent) {
         p->parent       = parent;
         p->next_sibling = parent->first_child;
-        p->prev_sibling = NULL;
+        // prev_sibling ya está inicializado a NULL por memset, no es necesario reasignarlo
         if (parent->first_child) parent->first_child->prev_sibling = p;
         parent->first_child = p;
     }

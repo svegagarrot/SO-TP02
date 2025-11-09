@@ -164,6 +164,7 @@ int pipe_close_by_id(uint64_t id, int is_writer) {
         p->read_pos = 0;
         p->write_pos = 0;
         p->count = 0;
+        // Limpieza explícita (readers y writers ya son 0 por should_destroy, pero se mantiene para claridad)
         p->readers = 0;
         p->writers = 0;
         

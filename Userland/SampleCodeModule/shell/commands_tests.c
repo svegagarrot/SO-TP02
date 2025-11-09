@@ -61,8 +61,8 @@ int testSyncCmd(int argc, char *argv[]) {
     }
 
     // Necesitamos 2 o 3 argumentos: repeticiones, [num_pares]
-    int num_args = (argc == 3) ? 2 : 1;
-    char **process_argv = (char **)malloc((num_args + 1) * sizeof(char *));
+    // Siempre asignamos espacio para 3 elementos (índices 0, 1, 2) para evitar desbordamiento
+    char **process_argv = (char **)malloc(3 * sizeof(char *));
     if (process_argv == NULL) {
         printf("Error: no se pudo asignar memoria para el proceso.\n");
         return CMD_ERROR;
@@ -131,8 +131,8 @@ int testNoSynchroCmd(int argc, char *argv[]) {
     }
 
     // Necesitamos 2 o 3 argumentos: repeticiones, [num_pares]
-    int num_args = (argc == 3) ? 2 : 1;
-    char **process_argv = (char **)malloc((num_args + 1) * sizeof(char *));
+    // Siempre asignamos espacio para 3 elementos (índices 0, 1, 2) para evitar desbordamiento
+    char **process_argv = (char **)malloc(3 * sizeof(char *));
     if (process_argv == NULL) {
         printf("Error: no se pudo asignar memoria para el proceso.\n");
         return CMD_ERROR;

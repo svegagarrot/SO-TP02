@@ -222,21 +222,24 @@ void mvar_writer_entry(void *arg) {
     uint64_t pipe_id;
     
     int i = 0;
-    while (argv[1][i] != '\0' && i < 31) {
+    // Verificar límites antes de acceder al array
+    while (i < 31 && argv[1][i] != '\0') {
         sem_empty[i] = argv[1][i];
         i++;
     }
     sem_empty[i] = '\0';
     
     i = 0;
-    while (argv[2][i] != '\0' && i < 31) {
+    // Verificar límites antes de acceder al array
+    while (i < 31 && argv[2][i] != '\0') {
         sem_full[i] = argv[2][i];
         i++;
     }
     sem_full[i] = '\0';
     
     i = 0;
-    while (argv[3][i] != '\0' && i < 31) {
+    // Verificar límites antes de acceder al array
+    while (i < 31 && argv[3][i] != '\0') {
         sem_mutex[i] = argv[3][i];
         i++;
     }
@@ -315,21 +318,24 @@ void mvar_reader_entry(void *arg) {
     
     // Copiar nombres de semáforos
     i = 0;
-    while (argv[1][i] != '\0' && i < 31) {
+    // Verificar límites antes de acceder al array
+    while (i < 31 && argv[1][i] != '\0') {
         sem_empty[i] = argv[1][i];
         i++;
     }
     sem_empty[i] = '\0';
     
     i = 0;
-    while (argv[2][i] != '\0' && i < 31) {
+    // Verificar límites antes de acceder al array
+    while (i < 31 && argv[2][i] != '\0') {
         sem_full[i] = argv[2][i];
         i++;
     }
     sem_full[i] = '\0';
     
     i = 0;
-    while (argv[3][i] != '\0' && i < 31) {
+    // Verificar límites antes de acceder al array
+    while (i < 31 && argv[3][i] != '\0') {
         sem_mutex[i] = argv[3][i];
         i++;
     }

@@ -47,6 +47,8 @@ int exceptionCmd(int argc, char * argv[]) {
     if (strcmp(argv[1], "zero") == 0) {
         int a = 1;
         int b = 0;
+        // División por cero intencional para probar manejo de excepciones
+        //-V609
         int c = a / b;   
         printf("c: %d\n", c); 
     }

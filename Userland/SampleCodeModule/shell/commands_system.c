@@ -42,7 +42,8 @@ int loopCmd(int argc, char *argv[]) {
     
     // Copiar el string del argumento
     int i = 0;
-    while (argv[1][i] != '\0' && i < 31) {
+    // Verificar límites antes de acceder al array
+    while (i < 31 && argv[1][i] != '\0') {
         seconds_str[i] = argv[1][i];
         i++;
     }

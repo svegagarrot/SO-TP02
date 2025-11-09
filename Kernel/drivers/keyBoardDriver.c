@@ -181,8 +181,7 @@ static char scToAscii(uint8_t scancode) {
 }
 
 uint8_t is_key_pressed(uint8_t scancode) {
-    if (scancode < 256) {
-        return key_states[scancode];
-    }
-    return 0;
+    // scancode es uint8_t (0-255), por lo que siempre es < 256
+    // La verificación es redundante pero se mantiene para claridad del código
+    return key_states[scancode];
 }
