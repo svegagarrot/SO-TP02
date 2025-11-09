@@ -1,0 +1,23 @@
+# PVS-Studio Suppressions
+# 
+# Format: <filename>:<line>:<diagnostic_code>
+# Example: kernel.c:42:V501
+#
+# Wildcards are supported:
+# - *pattern* matches any substring
+# - pattern* matches prefix
+# - *pattern matches suffix
+#
+# Documentation of diagnostic codes:
+# https://pvs-studio.com/en/docs/warnings/
+#
+# Common suppressions for false positives:
+# - V::1042 - External code (third-party libraries)
+# - V::522  - Null pointer dereference (if you've verified it's safe)
+# - V::523  - Use of uninitialized variable (if you know it's initialized)
+#
+# To suppress a specific warning, add a line like:
+# Bootloader/Pure64/*:*:V::1042
+# Kernel/lib.c:123:V522
+#
+# Leave this file empty if no suppressions are needed.

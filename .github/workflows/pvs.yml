@@ -1,0 +1,64 @@
+name: PVS-Studio Static Analysis
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  pvs-analysis:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential nasm qemu-system-x86
+        
+    - name: Install PVS-Studio
+      run: |
+        # Add PVS-Studio repository
+        wget -q -O - https://files.pvs-studio.com/etc/pubkey.txt | sudo apt-key add -
+        sudo wget -O /etc/apt/sources.list.d/viva64.list https://files.pvs-studio.com/etc/viva64.list
+        
+        # Install PVS-Studio
+        sudo apt-get update
+        sudo apt-get install -y pvs-studio
+        
+        # Accept license (for CI, you may need to provide credentials)
+        # pvs-studio-analyzer credentials <USERNAME> <KEY>
+        # For free analysis, use:
+        pvs-studio-analyzer credentials PVS-Studio FREE FREE
+        
+    - name: Run PVS-Studio analysis
+      run: make pvs
+      continue-on-error: true
+      id: pvs
+      
+    - name: Upload PVS-Studio report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: pvs-studio-report
+        path: pvs-report/
+        retention-days: 30
+        
+    - name: Upload PVS-Studio log
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: pvs-studio-log
+        path: pvs.log
+        retention-days: 30
+        
+    - name: Check for high-severity issues
+      run: |
+        if [ "${{ steps.pvs.outcome }}" = "failure" ]; then
+          echo "❌ PVS-Studio found high-severity issues!"
+          echo "Download the artifact to review the full report."
+          exit 1
+        fi
