@@ -32,13 +32,6 @@ static inline uint8_t clamp_priority(uint8_t pr) {
     return pr;
 }
 
-static int ready_queues_are_empty(void) {
-    for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
-        if (!process_queue_is_empty(&ready_queues[pr])) return 0;
-    }
-    return 1;
-}
-
 static void ready_queue_push(process_t *p) {
     if (!p) return;
     p->priority = clamp_priority(p->priority);
