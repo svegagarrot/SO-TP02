@@ -130,6 +130,12 @@ char keyboard_read_getchar() {
     return buffer_pop();
 }
 
+static void buffer_clear(void) {
+    buffer.readIndex = 0;
+    buffer.writeIndex = 0;
+    buffer.size = 0;
+}
+
 void keyboard_init(void) {
     if (kbd_sem_id == 0) {
         kbd_sem_id = sem_alloc(0);
@@ -142,12 +148,6 @@ void keyboard_wait_for_char(void) {
             sem_wait_by_id(kbd_sem_id);
         }
     }
-}
-
-static void buffer_clear(void) {
-    buffer.readIndex = 0;
-    buffer.writeIndex = 0;
-    buffer.size = 0;
 }
 
 void keyboard_clear_buffer(void) {

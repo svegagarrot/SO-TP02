@@ -42,10 +42,6 @@ static int ready_queues_are_empty(void) {
 static void ready_queue_push(process_t *p) {
     if (!p) return;
     p->priority = clamp_priority(p->priority);
-    
-    process_queue_remove(&blocked_q, p);
-    process_queue_remove(&finished_q, p);
-    
     process_queue_push(&ready_queues[p->priority], p);
 }
 
@@ -144,7 +140,6 @@ uint64_t schedule(uint64_t current_rsp) {
     uint64_t now = ticks_elapsed();
 
     apply_aging();
-    apply_aging();  
 
     bool quantum_expired = (now - last_switch_tick) >= QUANTUM_TICKS;
     bool must_switch = (current->state != PROCESS_STATE_RUNNING);
@@ -246,11 +241,18 @@ void scheduler_unblock_process(process_t *p) {
     }
     
     sched_crit_enter();
-    process_queue_remove(&blocked_q, p);
+    
+    // Solo remover de blocked_q si está BLOCKED
+    if (p->state == PROCESS_STATE_BLOCKED) {
+        process_queue_remove(&blocked_q, p);
+    }
+    
     p->state = PROCESS_STATE_READY;
     ready_queue_push(p);
+    
     if (current && p->priority > current->priority)
         need_resched = 1;
+    
     sched_crit_exit();
 }
 
@@ -283,22 +285,28 @@ static process_t *find_in_queue(process_queue_t *q, uint64_t pid) {
 process_t *scheduler_find_by_pid(uint64_t pid) {
     process_t *p;
     
+    // Buscar en ready queues
     for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
         if ((p = find_in_queue(&ready_queues[pr], pid))) {
             return p;
         }
     }
     
+    // Buscar en blocked queue
     if ((p = find_in_queue(&blocked_q, pid))) {
         return p;
     }
     
+    // Buscar en finished queue
     if ((p = find_in_queue(&finished_q, pid))) {
         return p;
     }
+    
+    // Verificar si es el proceso actual
     if (current && current->pid == pid) {
         return current;
     }
+    
     return NULL;
 }
 
@@ -324,11 +332,15 @@ int scheduler_kill_by_pid(uint64_t pid) {
         p->parent->is_foreground = 1;
     }
     
-    p->state = PROCESS_STATE_FINISHED;
-    for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
-        process_queue_remove(&ready_queues[pr], p);
+    // Remover de donde esté antes de mover a finished
+    if (p->state == PROCESS_STATE_READY) {
+        process_queue_remove(&ready_queues[p->priority], p);
+    } else if (p->state == PROCESS_STATE_BLOCKED) {
+        process_queue_remove(&blocked_q, p);
     }
-    process_queue_remove(&blocked_q, p);
+    
+    p->state = PROCESS_STATE_FINISHED;
+    
     while (p->waiters_head) {
         process_t *w = p->waiters_head;
         p->waiters_head = w->waiter_next;
@@ -338,9 +350,12 @@ int scheduler_kill_by_pid(uint64_t pid) {
         ready_queue_push(w);
     }
     process_queue_push(&finished_q, p);
+    
     sched_crit_exit();
+    
     if (p == current)
         need_resched = 1;
+    
     return 1;
 }
 
@@ -356,6 +371,7 @@ int scheduler_set_priority(uint64_t pid, uint8_t new_priority) {
         return 1;
     }
 
+    // Si el proceso está READY, necesitamos moverlo de una ready queue a otra
     if (p->state == PROCESS_STATE_READY) {
         process_queue_remove(&ready_queues[oldp], p);
     }
@@ -367,8 +383,10 @@ int scheduler_set_priority(uint64_t pid, uint8_t new_priority) {
     if (p->state == PROCESS_STATE_READY) {
         ready_queue_push(p);
     }
+    
     if (current && p->priority > current->priority)
         need_resched = 1;
+    
     sched_crit_exit();
     return 1;
 }
@@ -386,7 +404,9 @@ int scheduler_block_by_pid(uint64_t pid) {
         return 1;
     }
 
+    // Para cualquier otro proceso en estado READY, bloquearlo
     if (p->state == PROCESS_STATE_READY) {
+        // Remover de la ready queue específica donde debería estar
         process_queue_remove(&ready_queues[p->priority], p);
         p->state = PROCESS_STATE_BLOCKED;
         process_queue_push(&blocked_q, p);
@@ -395,29 +415,9 @@ int scheduler_block_by_pid(uint64_t pid) {
         return 1;
     }
     
-    if (p->state == PROCESS_STATE_BLOCKED) {
-        sched_crit_exit();
-        return 1;
-    }
-    
-    if (p->state == PROCESS_STATE_FINISHED) {
-        sched_crit_exit();
-        return 0;
-    }
-    
-    for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
-        if (find_in_queue(&ready_queues[pr], pid)) {
-            process_queue_remove(&ready_queues[pr], p);
-            p->state = PROCESS_STATE_BLOCKED;
-            process_queue_push(&blocked_q, p);
-            need_resched = 1;
-            sched_crit_exit();
-            return 1;
-        }
-    }
-    
+    // Si ya está bloqueado o terminado no hacemos nada
     sched_crit_exit();
-    return 0;  
+    return 1;
 }
 
 static void add_process_to_list(process_t *p, process_info_t *buffer, uint64_t *count, uint64_t max_count) {
@@ -431,13 +431,13 @@ static void add_process_to_list(process_t *p, process_info_t *buffer, uint64_t *
     for (i = 0; i < PROCESS_NAME_MAX_LEN && p->name[i] != '\0'; i++) {
         buffer[*count].name[i] = p->name[i];
     }
-    buffer[*count].name[i] = '\0'; 
+    buffer[*count].name[i] = '\0';
     
     buffer[*count].state = p->state;
     buffer[*count].priority = p->priority;
     buffer[*count].rsp = p->rsp;
     buffer[*count].rbp = p->rbp;
-    buffer[*count].foreground = p->is_foreground;  
+    buffer[*count].foreground = p->is_foreground;
     (*count)++;
 }
 
@@ -471,7 +471,7 @@ uint64_t scheduler_list_all_processes(process_info_t *buffer, uint64_t max_count
                 buffer[i].state = current->state;
                 buffer[i].rsp = current->rsp;
                 buffer[i].rbp = current->rbp;
-                buffer[i].foreground = current->is_foreground; 
+                buffer[i].foreground = current->is_foreground;
                 break;
             }
         }

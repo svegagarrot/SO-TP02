@@ -226,11 +226,9 @@ void process_queue_remove(process_queue_t *q, process_t *p) { detach_from_queue(
 void process_queue_push(process_queue_t *q, process_t *p) {
     if (!q || !p) return;
     
-    detach_from_queue(q, p);
-    
-    if (p->queue_next != NULL || p->queue_prev != NULL) {
-        p->queue_next = NULL;
-        p->queue_prev = NULL;
+    // Solo llamar detach_from_queue si el proceso parece estar en alguna cola
+    if (p->queue_next != NULL || p->queue_prev != NULL || q->head == p) {
+        detach_from_queue(q, p);
     }
     
     if (!q->head) {
@@ -239,6 +237,7 @@ void process_queue_push(process_queue_t *q, process_t *p) {
         q->size = 1;
         return;
     }
+    
     p->queue_prev = q->tail;
     p->queue_next = NULL;
     q->tail->queue_next = p;
