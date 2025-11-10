@@ -23,9 +23,7 @@ typedef enum { FD_TYPE_TERMINAL = 0, FD_TYPE_PIPE_READ = 1, FD_TYPE_PIPE_WRITE =
 
 typedef struct {
 	fd_type_t type;
-	union {
-		pipe_t *pipe;
-	};
+	pipe_t *pipe;
 } fd_entry_t;
 
 typedef enum {
