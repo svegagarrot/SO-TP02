@@ -11,7 +11,6 @@
 // Definición básica de FILE para compatibilidad
 // Nota: Esta es una declaración personalizada necesaria para el sistema bare metal
 // ya que no tenemos acceso a las librerías estándar del sistema
-//-V677
 typedef struct FILE FILE;
 
 typedef struct {
