@@ -79,6 +79,12 @@ int killCmd(int argc, char *argv[]) {
         return CMD_ERROR;
     }
 
+    int64_t current_pid = my_getpid();
+    if (pid == current_pid || pid == SHELL_PID) {
+        printf("Error: no se puede matar el proceso de la shell.\n");
+        return CMD_ERROR;
+    }
+
     int64_t result = my_kill(pid);
     if (result == 0) {
         printf("Error: no se pudo matar el proceso %lld. Puede que no exista.\n", pid);
@@ -98,6 +104,12 @@ int niceCmd(int argc, char *argv[]) {
     int64_t pid = atoi(argv[1]);
     if (pid <= 0) {
         printf("Error: PID invalido.\n");
+        return CMD_ERROR;
+    }
+
+    int64_t current_pid = my_getpid();
+    if (pid == current_pid || pid == SHELL_PID) {
+        printf("Error: no se puede cambiar la prioridad del proceso de la shell.\n");
         return CMD_ERROR;
     }
 
@@ -126,6 +138,12 @@ int blockCmd(int argc, char *argv[]) {
     int64_t pid = atoi(argv[1]);
     if (pid <= 0) {
         printf("Error: PID invalido.\n");
+        return CMD_ERROR;
+    }
+
+    int64_t current_pid = my_getpid();
+    if (pid == current_pid || pid == SHELL_PID) {
+        printf("Error: no se puede bloquear/desbloquear el proceso de la shell.\n");
         return CMD_ERROR;
     }
 
