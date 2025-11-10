@@ -1,3 +1,5 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #include <pipe.h>
 #include <semaphore.h>
 #include <process.h>
@@ -32,14 +34,15 @@ void pipe_system_init(void) {
     for (int i = 0; i < MAX_PIPES; i++) {
         pipes[i].used = 0;
         pipes[i].id = 0;
-        pipes[i].sem_items = 0;
-        pipes[i].sem_spaces = 0;
-        pipes[i].mutex = 0;
         pipes[i].read_pos = 0;
         pipes[i].write_pos = 0;
         pipes[i].count = 0;
         pipes[i].readers = 0;
         pipes[i].writers = 0;
+        // Los semáforos se inicializan a 0 y se crean dinámicamente en pipe_create
+        pipes[i].sem_items = 0;
+        pipes[i].sem_spaces = 0;
+        pipes[i].mutex = 0;
     }
     next_pipe_id = 1;
 }
@@ -164,9 +167,8 @@ int pipe_close_by_id(uint64_t id, int is_writer) {
         p->read_pos = 0;
         p->write_pos = 0;
         p->count = 0;
-        // Limpieza explícita (readers y writers ya son 0 por should_destroy, pero se mantiene para claridad)
-        p->readers = 0;
-        p->writers = 0;
+        // readers y writers ya son 0 debido a la condición should_destroy
+        // No es necesario reasignarlos
         
         // Liberar mutex (ya no lo necesitamos)
         sem_signal_by_id(mutex_id);

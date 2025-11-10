@@ -1,3 +1,5 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #include <process.h>
 #include <mm.h>
 #include <interrupts.h>
@@ -16,12 +18,18 @@ static uint64_t next_pid = 1;
 static void copy_name(process_t *p, const char *name) {
     const char *src = (name ? name : "proc");
     size_t i = 0;
-    // Copiar hasta PROCESS_NAME_MAX_LEN caracteres (índices 0 a PROCESS_NAME_MAX_LEN-1)
-    for (; i < PROCESS_NAME_MAX_LEN && src[i]; ++i) {
+    // Copiar hasta PROCESS_NAME_MAX_LEN-1 caracteres para dejar espacio para '\0'
+    while (i < PROCESS_NAME_MAX_LEN && src[i] != '\0') {
         p->name[i] = src[i];
+        i++;
     }
-    // Asegurar que el string termina en null (índice i está garantizado <= PROCESS_NAME_MAX_LEN)
-    p->name[i] = '\0';
+    // Asegurar que el string termina en null
+    // i está garantizado <= PROCESS_NAME_MAX_LEN
+    if (i < sizeof(p->name)) {
+        p->name[i] = '\0';
+    } else {
+        p->name[sizeof(p->name) - 1] = '\0';
+    }
 }
 
 void process_system_init(void) { next_pid = 1; }

@@ -1,3 +1,5 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #include <lib.h>
 #include <moduleLoader.h>
 #include <keyboardDriver.h>
@@ -29,7 +31,7 @@ void clearBSS(void * bssAddress, uint64_t bssSize)
 
 void * getStackBase()
 {
-    return (void*)(
+    return (void*)(uintptr_t)(
         (uint64_t)&endOfKernel
         + PageSize * 8
         - sizeof(uint64_t)
@@ -51,7 +53,7 @@ void * initializeKernelBinary()
 
     loadModules((&endOfKernelBinary), moduleAddresses);
 
-    clearBSS(&bss, (uint64_t)&endOfKernel - (uint64_t)&bss);
+    clearBSS(&bss, (uint64_t)(uintptr_t)&endOfKernel - (uint64_t)(uintptr_t)&bss);
 
     return getStackBase();
 }

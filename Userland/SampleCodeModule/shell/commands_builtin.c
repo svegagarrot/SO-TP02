@@ -1,3 +1,5 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #include "../include/commands.h"
 #include "../include/lib.h"
 #include "../include/shell.h"
@@ -45,10 +47,12 @@ int exceptionCmd(int argc, char * argv[]) {
     }
 
     if (strcmp(argv[1], "zero") == 0) {
-        int a = 1;
-        int b = 0;
         // División por cero intencional para probar manejo de excepciones
-        int c = a / b;   
+        // Se usa volatile para evitar que el compilador optimice la división
+        volatile int a = 1;
+        volatile int b = 0;
+        //-V609 División por cero intencional para test de excepciones
+        volatile int c = a / b;   
         printf("c: %d\n", c); 
     }
     else if (strcmp(argv[1], "invalidopcode") == 0) {

@@ -2,16 +2,19 @@
 #define LIB_H
 
 #define BUFFER_SIZE 256
-#define stdin ((FILE*)0) 
+// Nota: stdin se define como NULL para compatibilidad con fgets en bare metal
+// En nuestro sistema, fgets ignora este parámetro y lee directamente de fd 0
+#define stdin ((FILE*)(uintptr_t)0) 
 
 #include <stdint.h>
 #include <stddef.h>
 #include <math.h>
 
-// Definición básica de FILE para compatibilidad
-// Nota: Esta es una declaración personalizada necesaria para el sistema bare metal
-// ya que no tenemos acceso a las librerías estándar del sistema
-typedef struct FILE FILE;
+// Definición de FILE para compatibilidad con bare metal
+// Usamos un nombre interno para evitar conflicto con definiciones estándar
+typedef struct _BareMetal_FILE {
+    int _unused;  // Campo ficticio para que la estructura no esté vacía
+} FILE;
 
 typedef struct {
     uint64_t total_bytes;

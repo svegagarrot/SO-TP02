@@ -1,3 +1,5 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 
 #include "../include/lib.h"
 #include "test_util.h"
@@ -23,7 +25,7 @@ uint64_t test_mm(uint64_t argc, char *argv[]) {
     return -1;
 
   printf("=== TEST DE MEMORIA INICIADO ===\n");
-  printf("Memoria maxima: %d bytes\n", max_memory);
+  printf("Memoria maxima: %llu bytes\n", (unsigned long long)max_memory);
   printf("Bloques maximos: %d\n", MAX_BLOCKS);
   printf("Presiona Ctrl+C para detener\n\n");
 
@@ -33,7 +35,7 @@ uint64_t test_mm(uint64_t argc, char *argv[]) {
     rq = 0;
     total = 0;
 
-    printf("Iteracion %d: ", iteration);
+    printf("Iteracion %llu: ", (unsigned long long)iteration);
 
     // Request as many blocks as we can
     while (rq < MAX_BLOCKS && total < max_memory) {
@@ -49,7 +51,7 @@ uint64_t test_mm(uint64_t argc, char *argv[]) {
       }
     }
 
-    printf("Asignados %d bloques (%d bytes) - ", rq, total);
+    printf("Asignados %u bloques (%u bytes) - ", (unsigned int)rq, (unsigned int)total);
 
     // Set
     uint32_t i;

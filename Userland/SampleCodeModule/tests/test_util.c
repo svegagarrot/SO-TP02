@@ -1,3 +1,5 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #include <stdint.h>
 #include "lib.h"
 
@@ -13,7 +15,7 @@ uint32_t GetUint() {
 
 uint32_t GetUniform(uint32_t max) {
   uint32_t u = GetUint();
-  return (u + 1.0) * 2.328306435454494e-10 * max;
+  return (uint32_t)((u + 1.0) * 2.328306435454494e-10 * max);
 }
 
 // Memory
@@ -67,7 +69,7 @@ void endless_loop_print(uint64_t wait) {
   int64_t pid = my_getpid();
 
   while (1) {
-    printf("%d ", pid);
+    printf("%lld ", (long long)pid);
     bussy_wait(wait);
   }
 }

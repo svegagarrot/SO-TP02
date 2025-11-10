@@ -1,3 +1,5 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #include <stdint.h>
 #include "lib.h"
 #include "test_util.h"
@@ -46,7 +48,7 @@ uint64_t test_prio(uint64_t argc, char *argv[]) {
   for (i = 0; i < TOTAL_PROCESSES; i++) {
     pids[i] = my_create_process("zero_to_max", zero_to_max, ztm_argv, 1, 0);
     my_nice(pids[i], prio[i]);
-    printf("  PROCESS %lld NEW PRIORITY: %d\n", pids[i], prio[i]);
+    printf("  PROCESS %lld NEW PRIORITY: %lld\n", (long long)pids[i], (long long)prio[i]);
   }
 
   // Expect the priorities to take effect
@@ -60,7 +62,7 @@ uint64_t test_prio(uint64_t argc, char *argv[]) {
     pids[i] = my_create_process("zero_to_max", zero_to_max, ztm_argv, 1, 0);
     my_block(pids[i]);
     my_nice(pids[i], prio[i]);
-    printf("  PROCESS %lld NEW PRIORITY: %d\n", pids[i], prio[i]);
+    printf("  PROCESS %lld NEW PRIORITY: %lld\n", (long long)pids[i], (long long)prio[i]);
   }
 
   for (i = 0; i < TOTAL_PROCESSES; i++)

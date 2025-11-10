@@ -1,3 +1,5 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #include "../../include/lib.h"
 #include "../../include/syscall.h"
 #include <stdarg.h>
@@ -24,24 +26,44 @@ int getchar(void) {
     return (int)c;
 }
 
-char *fgets(char *s, int n, FILE *stream) {
+// Función interna para leer líneas (no requiere FILE*)
+static char *read_line_internal(char *s, int n) {
     int i = 0;
     char c;
 
-    if (n <= 0) return 0;
+    // Validar parámetros
+    if (n <= 0 || s == NULL) {
+        return NULL;
+    }
 
     while (i < n - 1) {
-        int read;
-        do {
-            read = sys_read(0, &c, 1);  // stdin siempre es fd 0
-        } while (read == 0);  
+        int read = sys_read(0, &c, 1);  // stdin siempre es fd 0
+        
+        // Si read retorna error o EOF, terminar
+        if (read <= 0) {
+            break;
+        }
 
         s[i++] = c;
-        if (c == '\n') break;
+        if (c == '\n') {
+            break;
+        }
+    }
+
+    // Si no se leyó nada, retornar NULL
+    if (i == 0) {
+        return NULL;
     }
 
     s[i] = '\0';
     return s;
+}
+
+char *fgets(char *s, int n, FILE *stream) {
+    // En bare metal, ignoramos el parámetro stream
+    // y leemos directamente de stdin (fd 0)
+    (void)stream;  // Suprimir warning de parámetro no usado
+    return read_line_internal(s, n);
 }
 
 void printHex64(uint64_t value) {
@@ -67,9 +89,8 @@ int scanf(const char *fmt, ...) {
     va_start(args, fmt);
 
     char input[BUFFER_SIZE];
-    // stdin está definido como ((FILE*)0), pero fgets no lo usa realmente (lee de fd 0 directamente)
-    // Se agrega verificación para satisfacer al analizador estático
-    if (stdin == NULL || !fgets(input, BUFFER_SIZE, stdin)) {
+    // Usar función interna que no requiere FILE*
+    if (!read_line_internal(input, BUFFER_SIZE)) {
         va_end(args);
         return 0;
     }
@@ -169,8 +190,7 @@ int scanf(const char *fmt, ...) {
                 }
                 case 'c': {
                     char *dest = va_arg(args, char *);
-                    // input[index] != '\0' siempre es verdadero aquí porque ya se verificó
-                    // en la línea 88 que no es '\n' ni '\0' antes de llegar aquí
+                    // En este punto, ya verificamos que input[index] no es '\n' ni '\0'
                     *dest = input[index];
                     index++;
                     count++;
