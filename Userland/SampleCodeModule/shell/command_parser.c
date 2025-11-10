@@ -9,7 +9,6 @@ static int find_command_index(const char *name);
 static int contains_pipe_symbol(const char *input);
 static int execute_pipeline(char *left_input, char *right_input);
 
-// Función helper para obtener la función de entrada del proceso desde el índice del comando
 void *get_process_entry_function(int cmd_idx) {
 	if (cmd_idx < 0)
 		return NULL;
@@ -18,7 +17,6 @@ void *get_process_entry_function(int cmd_idx) {
 	if (!name)
 		return NULL;
 
-	// Mapear nombre del comando a su función de entrada
 	if (strcmp(name, "cat") == 0)
 		return (void *) cat_process_entry;
 	if (strcmp(name, "wc") == 0)
@@ -47,7 +45,6 @@ void *get_process_entry_function(int cmd_idx) {
 	return NULL;
 }
 
-// Función unificada para ejecutar comandos externos con o sin pipes
 int64_t execute_external_command(const char *name, void *function, char *argv[], int is_foreground,
 								 uint64_t stdin_pipe_id, uint64_t stdout_pipe_id) {
 	if (!name || !function) {
@@ -56,7 +53,6 @@ int64_t execute_external_command(const char *name, void *function, char *argv[],
 
 	int64_t pid;
 
-	// Si hay pipes, usar my_create_process_with_pipes, sino usar my_create_process
 	if (stdin_pipe_id != 0 || stdout_pipe_id != 0) {
 		pid = my_create_process_with_pipes((char *) name, function, argv, 1, is_foreground, stdin_pipe_id,
 										   stdout_pipe_id);
@@ -69,7 +65,6 @@ int64_t execute_external_command(const char *name, void *function, char *argv[],
 		return -1;
 	}
 
-	// Si está en foreground, esperar a que termine
 	if (is_foreground) {
 		my_wait(pid);
 	}
@@ -137,7 +132,6 @@ static int execute_pipeline(char *left_input, char *right_input) {
 		return CMD_ERROR;
 	}
 
-	// Obtener funciones de entrada de los procesos
 	void *left_function = get_process_entry_function(left_idx);
 	void *right_function = get_process_entry_function(right_idx);
 
@@ -146,7 +140,6 @@ static int execute_pipeline(char *left_input, char *right_input) {
 		return CMD_ERROR;
 	}
 
-	// Preparar argumentos para el comando izquierdo (sin el nombre del comando)
 	char **left_process_argv = NULL;
 	if (left_argc > 1) {
 		left_process_argv = (char **) malloc((left_argc) * sizeof(char *));
@@ -162,7 +155,6 @@ static int execute_pipeline(char *left_input, char *right_input) {
 		}
 	}
 
-	// Preparar argumentos para el comando derecho (sin el nombre del comando)
 	char **right_process_argv = NULL;
 	if (right_argc > 1) {
 		right_process_argv = (char **) malloc((right_argc) * sizeof(char *));
@@ -178,8 +170,6 @@ static int execute_pipeline(char *left_input, char *right_input) {
 		}
 	}
 
-	// Ejecutar comando izquierdo con stdout redirigido al pipe
-	// El proceso izquierdo (escritor) se ejecuta en background
 	int64_t left_pid =
 		execute_external_command(shellCmds[left_idx].name, left_function, left_process_argv, 0, 0, pipe_id);
 
@@ -187,8 +177,6 @@ static int execute_pipeline(char *left_input, char *right_input) {
 	int64_t right_pid = -1;
 
 	if (left_pid > 0) {
-		// Ejecutar comando derecho con stdin redirigido desde el pipe
-		// El proceso derecho (lector) se ejecuta en FOREGROUND para que Ctrl+C funcione
 		right_pid =
 			execute_external_command(shellCmds[right_idx].name, right_function, right_process_argv, 1, pipe_id, 0);
 
@@ -197,8 +185,6 @@ static int execute_pipeline(char *left_input, char *right_input) {
 		}
 		else {
 			printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[right_idx].name);
-			// Limpiar proceso izquierdo si falló el derecho
-			// left_pid > 0 siempre es verdadero aquí porque estamos dentro del bloque if (left_pid > 0)
 			my_kill(left_pid);
 		}
 	}
@@ -206,19 +192,14 @@ static int execute_pipeline(char *left_input, char *right_input) {
 		printf("Error: el comando '%s' no puede usarse en un pipe.\n", shellCmds[left_idx].name);
 	}
 
-	// El proceso derecho (foreground) ya fue esperado por execute_external_command
-	// Ahora debemos limpiar el proceso izquierdo
+
 	if (status == OK && left_pid > 0) {
-		// Dar un momento para que el proceso izquierdo detecte que el pipe se cerró
-		// y termine naturalmente
+		
 		my_yield();
 
-		// Si el proceso izquierdo todavía está vivo, matarlo
-		// (esto pasa si el proceso tiene un loop infinito y no verifica errores de write)
 		my_kill(left_pid);
 	}
 
-	// Liberar argumentos copiados DESPUÉS de que los procesos terminen
 	if (left_process_argv) {
 		for (int i = 0; left_process_argv[i] != NULL; i++) {
 			free(left_process_argv[i]);
@@ -244,7 +225,6 @@ int CommandParse(char *commandInput) {
 			char *right_input = p + 1;
 			*p = '\0';
 
-			// Saltar espacios iniciales en la segunda parte
 			while (*right_input == ' ') {
 				right_input++;
 			}
@@ -264,27 +244,23 @@ int CommandParse(char *commandInput) {
 	if (argc == 0)
 		return ERROR;
 
-	// Detectar si el último argumento es "&" para ejecutar en background
 	int is_background = 0;
 	if (argc > 0 && strcmp(args[argc - 1], "&") == 0) {
 		is_background = 1;
-		argc--; // Remover el "&" de los argumentos
+		argc--; 
 		if (argc == 0) {
-			return ERROR; // Solo había "&", comando inválido
+			return ERROR; 
 		}
 	}
 
 	for (int i = 0; shellCmds[i].name; i++) {
 		if (strcmp(args[0], shellCmds[i].name) == 0) {
-			// Pasar información de background a través de una variable global temporal
 			extern int g_run_in_background;
 			g_run_in_background = is_background;
 
-			// Para comandos built-in, ejecutar directamente
-			// Para comandos externos, la función del comando debe crear el proceso
 			int result = shellCmds[i].function(argc, args);
 
-			g_run_in_background = 0; // Reset
+			g_run_in_background = 0; 
 			return result;
 		}
 	}

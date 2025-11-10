@@ -47,11 +47,8 @@ int exceptionCmd(int argc, char *argv[]) {
 	}
 
 	if (strcmp(argv[1], "zero") == 0) {
-		// División por cero intencional para probar manejo de excepciones
-		// Se usa volatile para evitar que el compilador optimice la división
 		volatile int a = 1;
 		volatile int b = 0;
-		//-V609 División por cero intencional para test de excepciones
 		volatile int c = a / b;
 		printf("c: %d\n", c);
 	}
@@ -148,7 +145,6 @@ int blockCmd(int argc, char *argv[]) {
 		return CMD_ERROR;
 	}
 
-	// Para determinar si está bloqueado, consultamos la lista de procesos
 	process_info_t processes[MAX_PROCESS_INFO];
 	uint64_t count = list_processes(processes, MAX_PROCESS_INFO);
 

@@ -5,9 +5,6 @@
 #include <stdarg.h>
 #include <stddef.h>
 
-// ============================================================================
-// BASIC I/O FUNCTIONS
-// ============================================================================
 
 int putchar(int c) {
 	char ch = (char) c;
@@ -26,12 +23,10 @@ int getchar(void) {
 	return (int) c;
 }
 
-// Función interna para leer líneas (no requiere FILE*)
 static char *read_line_internal(char *s, int n) {
 	int i = 0;
 	char c;
 
-	// Validar parámetros
 	if (n <= 0 || s == NULL) {
 		return NULL;
 	}
@@ -39,7 +34,6 @@ static char *read_line_internal(char *s, int n) {
 	while (i < n - 1) {
 		int read = sys_read(0, &c, 1); // stdin siempre es fd 0
 
-		// Si read retorna error o EOF, terminar
 		if (read <= 0) {
 			break;
 		}
@@ -50,7 +44,6 @@ static char *read_line_internal(char *s, int n) {
 		}
 	}
 
-	// Si no se leyó nada, retornar NULL
 	if (i == 0) {
 		return NULL;
 	}
@@ -60,9 +53,7 @@ static char *read_line_internal(char *s, int n) {
 }
 
 char *fgets(char *s, int n, FILE *stream) {
-	// En bare metal, ignoramos el parámetro stream
-	// y leemos directamente de stdin (fd 0)
-	(void) stream; // Suprimir warning de parámetro no usado
+	(void) stream; 
 	return read_line_internal(s, n);
 }
 
@@ -77,19 +68,11 @@ void printHex64(uint64_t value) {
 	printf("0x%s", hex);
 }
 
-// ============================================================================
-// SCANF IMPLEMENTATION
-// ============================================================================
-
-// Forward declaration needed by scanf
-extern int atoi(const char *str);
-
 int scanf(const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
 
 	char input[BUFFER_SIZE];
-	// Usar función interna que no requiere FILE*
 	if (!read_line_internal(input, BUFFER_SIZE)) {
 		va_end(args);
 		return 0;
@@ -190,7 +173,6 @@ int scanf(const char *fmt, ...) {
 				}
 				case 'c': {
 					char *dest = va_arg(args, char *);
-					// En este punto, ya verificamos que input[index] no es '\n' ni '\0'
 					*dest = input[index];
 					index++;
 					count++;
@@ -217,13 +199,6 @@ int scanf(const char *fmt, ...) {
 	va_end(args);
 	return count;
 }
-
-// ============================================================================
-// PRINTF IMPLEMENTATION
-// ============================================================================
-
-// Forward declaration needed by printf
-extern size_t strlen(const char *s);
 
 int printf(const char *fmt, ...) {
 	va_list args;
@@ -361,8 +336,7 @@ int printf(const char *fmt, ...) {
 							break;
 						}
 					}
-					// Si es solo 'l' sin 'l' adicional, tratarlo como caso default
-					// fallthrough
+					
 				default:
 					putchar('%');
 					putchar(fmt[i]);
@@ -379,10 +353,6 @@ int printf(const char *fmt, ...) {
 	va_end(args);
 	return count;
 }
-
-// ============================================================================
-// SPRINTF IMPLEMENTATION
-// ============================================================================
 
 static int append_unsigned_to_str(char *dest, int *index, uint64_t value) {
 	if (value == 0) {

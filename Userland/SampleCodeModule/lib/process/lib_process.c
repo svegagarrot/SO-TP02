@@ -5,29 +5,20 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// ============================================================================
-// PROCESS MANAGEMENT
-// ============================================================================
-
 static int64_t g_last_spawned_pid = -1;
 
-// Forward declarations needed
 extern int strcmp(const char *s1, const char *s2);
 extern size_t strlen(const char *s);
 extern void *malloc(size_t size);
 extern void free(void *ptr);
 
-// Resolver de nombre -> puntero a función para tests que pasan function=NULL
 static void *resolve_function_by_name(const char *name) {
 	if (name == NULL)
 		return NULL;
-	// Declaraciones adelantadas de funciones de tests
-	// test_prio.c
+	
 	void zero_to_max(void);
-	// test_util.c
 	void endless_loop(void);
 	void endless_loop_print(uint64_t wait);
-	// test_sync.c
 	uint64_t my_process_inc(char *argv[]);
 
 	if (strcmp(name, "zero_to_max") == 0)
@@ -42,13 +33,10 @@ static void *resolve_function_by_name(const char *name) {
 }
 
 int64_t my_create_process(char *name, void *function, char *argv[], uint64_t priority, int is_foreground) {
-	// Some tests pass a small integer (argc) instead of NULL as the function
-	// argument (e.g. my_create_process("my_process_inc", 3, argv); ). Treat
-	// small integers as sentinel values and resolve the function by name.
 	if (function == NULL || (uintptr_t) function < 0x10000) {
 		function = resolve_function_by_name(name);
 		if (function == NULL) {
-			return -1; // No se pudo resolver
+			return -1; 
 		}
 	}
 	int64_t pid = (int64_t) sys_create_process(name, function, argv, priority, (uint64_t) is_foreground);
@@ -60,20 +48,13 @@ int64_t my_create_process(char *name, void *function, char *argv[], uint64_t pri
 
 int64_t my_create_process_with_pipes(char *name, void *function, char *argv[], uint64_t priority, int is_foreground,
 									 uint64_t stdin_pipe_id, uint64_t stdout_pipe_id) {
-	// Some tests pass a small integer (argc) instead of NULL as the function
-	// argument (e.g. my_create_process("my_process_inc", 3, argv); ). Treat
-	// small integers as sentinel values and resolve the function by name.
 	if (function == NULL || (uintptr_t) function < 0x10000) {
 		function = resolve_function_by_name(name);
 		if (function == NULL) {
-			return -1; // No se pudo resolver
+			return -1; 
 		}
 	}
 
-	// Empaquetar parámetros:
-	// Bits 0-15: stdin_pipe_id
-	// Bits 16-31: stdout_pipe_id
-	// Bit 32: is_foreground
 	uint64_t packed =
 		(stdin_pipe_id & 0xFFFF) | ((stdout_pipe_id & 0xFFFF) << 16) | (((uint64_t) is_foreground & 0x1) << 32);
 
@@ -132,12 +113,7 @@ int64_t get_last_spawned_pid(void) {
 	return g_last_spawned_pid;
 }
 
-// ============================================================================
-// SEMAPHORE MANAGEMENT
-// ============================================================================
 
-/* Simple userland name -> semaphore id mapping so tests can use string names
-   e.g. "sem" as used in test_sync.c. Keeps a small table of open semaphores. */
 #define MAX_USER_SEMS 8
 static char *user_sem_names[MAX_USER_SEMS];
 static uint64_t user_sem_ids[MAX_USER_SEMS];
@@ -164,7 +140,6 @@ int64_t my_sem_open(char *sem_id, uint64_t initialValue) {
 		return 0;
 	int idx = find_sem_index(sem_id);
 	if (idx >= 0) {
-		/* already opened: bump kernel refcount */
 		sys_sem_open(user_sem_ids[idx]);
 		return 1;
 	}

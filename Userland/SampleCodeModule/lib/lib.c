@@ -4,10 +4,6 @@
 #include "../include/syscall.h"
 #include <stddef.h>
 
-// ============================================================================
-// MISCELLANEOUS UTILITY FUNCTIONS
-// ============================================================================
-
 int try_getchar(char *c) {
 	(void) c;
 	return 0;
@@ -32,10 +28,6 @@ void shutdown() {
 	sys_shutdown();
 }
 
-// ============================================================================
-// PIPE FUNCTIONS
-// ============================================================================
-
 uint64_t pipe_create(void) {
 	return sys_pipe_create();
 }
@@ -59,7 +51,7 @@ uint64_t pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode) {
 		return 0;
 	}
 	if (mode != 0 && mode != 1) {
-		return 0; // mode debe ser 0 (lectura) o 1 (escritura)
+		return 0;
 	}
 	return sys_pipe_dup(pipe_id, fd, mode);
 }

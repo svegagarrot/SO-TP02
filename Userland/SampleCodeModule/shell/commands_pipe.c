@@ -7,7 +7,6 @@
 
 extern int g_run_in_background;
 
-// cat: Imprime stdin tal como lo recibe
 int catCmd(int argc, char *argv[]) {
 	int is_foreground = g_run_in_background ? 0 : 1;
 	int64_t pid = execute_external_command("cat", cat_process_entry, NULL, is_foreground, 0, 0);
@@ -20,7 +19,6 @@ int catCmd(int argc, char *argv[]) {
 	return OK;
 }
 
-// wc: Cuenta la cantidad de líneas del input
 int wcCmd(int argc, char *argv[]) {
 	int is_foreground = g_run_in_background ? 0 : 1;
 	int64_t pid = execute_external_command("wc", wc_process_entry, NULL, is_foreground, 0, 0);
@@ -33,7 +31,6 @@ int wcCmd(int argc, char *argv[]) {
 	return OK;
 }
 
-// filter: Filtra las vocales del input
 int filterCmd(int argc, char *argv[]) {
 	int is_foreground = g_run_in_background ? 0 : 1;
 	int64_t pid = execute_external_command("filter", filter_process_entry, NULL, is_foreground, 0, 0);
@@ -46,7 +43,6 @@ int filterCmd(int argc, char *argv[]) {
 	return OK;
 }
 
-// mvar: Simula MVar con múltiples lectores y escritores
 int mvarCmd(int argc, char *argv[]) {
 	if (argc != 3) {
 		printf("Uso: mvar <num_escritores> <num_lectores>\n");
@@ -68,7 +64,6 @@ int mvarCmd(int argc, char *argv[]) {
 		return CMD_ERROR;
 	}
 
-	// Crear nombres únicos para los semáforos usando el PID actual
 	int64_t current_pid = my_getpid();
 	char sem_empty[32];
 	char sem_full[32];
@@ -78,7 +73,6 @@ int mvarCmd(int argc, char *argv[]) {
 	sprintf(sem_full, "mvar_f_%lld", current_pid);
 	sprintf(sem_mutex, "mvar_m_%lld", current_pid);
 
-	// Crear semáforos
 	// sem_empty: inicialmente 1 (variable vacía, escritores pueden escribir)
 	// sem_full: inicialmente 0 (no hay valor, lectores deben esperar)
 	// sem_mutex: inicialmente 1 (mutex libre)
@@ -100,7 +94,6 @@ int mvarCmd(int argc, char *argv[]) {
 		return CMD_ERROR;
 	}
 
-	// Crear pipe para comunicación entre escritores y lectores
 	uint64_t pipe_id = pipe_create();
 	if (pipe_id == 0) {
 		printf("Error: no se pudo crear el pipe.\n");
@@ -113,7 +106,6 @@ int mvarCmd(int argc, char *argv[]) {
 	printf("Iniciando simulacion de MVar con %d escritores y %d lectores...\n", num_writers, num_readers);
 	printf("Pipe ID: %llu\n", pipe_id);
 
-	// Crear procesos escritores
 	for (int i = 0; i < num_writers; i++) {
 		char **process_argv = (char **) malloc(6 * sizeof(char *));
 		if (process_argv == NULL) {
@@ -121,7 +113,6 @@ int mvarCmd(int argc, char *argv[]) {
 			continue;
 		}
 
-		// Argumento 0: ID del escritor
 		process_argv[0] = (char *) malloc(2);
 		if (process_argv[0] == NULL) {
 			free(process_argv);
@@ -166,7 +157,7 @@ int mvarCmd(int argc, char *argv[]) {
 		for (int j = 0; j <= len; j++)
 			process_argv[3][j] = sem_mutex[j];
 
-		// Argumento 4: pipe_id (como string)
+		// Argumento 4: pipe_id 
 		process_argv[4] = (char *) malloc(32);
 		if (process_argv[4] == NULL) {
 			free(process_argv[0]);
@@ -192,7 +183,6 @@ int mvarCmd(int argc, char *argv[]) {
 		}
 	}
 
-	// Crear procesos lectores
 	for (int i = 0; i < num_readers; i++) {
 		char **process_argv = (char **) malloc(6 * sizeof(char *));
 		if (process_argv == NULL) {
@@ -200,7 +190,6 @@ int mvarCmd(int argc, char *argv[]) {
 			continue;
 		}
 
-		// Argumento 0: ID del lector
 		process_argv[0] = (char *) malloc(12);
 		if (process_argv[0] == NULL) {
 			free(process_argv);
@@ -208,7 +197,6 @@ int mvarCmd(int argc, char *argv[]) {
 		}
 		sprintf(process_argv[0], "%d", i);
 
-		// Argumento 1: sem_empty
 		int len = strlen(sem_empty);
 		process_argv[1] = (char *) malloc(len + 1);
 		if (process_argv[1] == NULL) {
@@ -219,7 +207,6 @@ int mvarCmd(int argc, char *argv[]) {
 		for (int j = 0; j <= len; j++)
 			process_argv[1][j] = sem_empty[j];
 
-		// Argumento 2: sem_full
 		len = strlen(sem_full);
 		process_argv[2] = (char *) malloc(len + 1);
 		if (process_argv[2] == NULL) {
@@ -231,7 +218,6 @@ int mvarCmd(int argc, char *argv[]) {
 		for (int j = 0; j <= len; j++)
 			process_argv[2][j] = sem_full[j];
 
-		// Argumento 3: sem_mutex
 		len = strlen(sem_mutex);
 		process_argv[3] = (char *) malloc(len + 1);
 		if (process_argv[3] == NULL) {
@@ -244,7 +230,6 @@ int mvarCmd(int argc, char *argv[]) {
 		for (int j = 0; j <= len; j++)
 			process_argv[3][j] = sem_mutex[j];
 
-		// Argumento 4: pipe_id (como string)
 		process_argv[4] = (char *) malloc(32);
 		if (process_argv[4] == NULL) {
 			free(process_argv[0]);

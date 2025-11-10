@@ -4,10 +4,6 @@
 #include "../../include/syscall.h"
 #include <stddef.h>
 
-// ============================================================================
-// MEMORY MANAGEMENT
-// ============================================================================
-
 void *malloc(size_t size) {
 	return (void *) sys_malloc(size);
 }
@@ -28,6 +24,5 @@ int memory_info(memory_info_t *info) {
 int get_type_of_mm(char *buf, int buflen) {
 	if (!buf || buflen <= 0)
 		return 0;
-	// call asm stub
 	return (int) sys_get_type_of_mm(buf, buflen);
 }

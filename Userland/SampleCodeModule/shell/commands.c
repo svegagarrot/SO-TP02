@@ -3,10 +3,8 @@
 #include "../include/commands.h"
 #include <stddef.h>
 
-// Variable global para manejar ejecución en background
 int g_run_in_background = 0;
 
-// Array de comandos disponibles en el shell
 const TShellCmd shellCmds[] = {
 	{"help", helpCmd, ": Muestra los comandos disponibles\n", 1},
 	{"exit", exitCmd, ": Salir del shell\n", 1},
