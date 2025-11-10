@@ -25,12 +25,6 @@ static process_t *current = NULL;
 static process_t *idle_p = NULL;
 static uint64_t last_switch_tick = 0;
 
-static inline void sched_crit_enter(void) {
-	_cli();
-}
-static inline void sched_crit_exit(void) {
-	_sti();
-}
 
 static inline uint8_t clamp_priority(uint8_t pr) {
 	// pr es uint8_t, por lo que pr < PROCESS_PRIORITY_MIN (0) siempre es falso
@@ -205,10 +199,8 @@ void scheduler_add_process(process_t *p) {
 	if (!p || p == idle_p) {
 		return;
 	}
-	sched_crit_enter();
 	p->state = PROCESS_STATE_READY;
 	ready_queue_push(p);
-	sched_crit_exit();
 }
 
 process_t *scheduler_spawn_process(const char *name, process_entry_point_t entry_point, void *entry_arg,
@@ -247,8 +239,6 @@ void scheduler_unblock_process(process_t *p) {
 		return;
 	}
 
-	sched_crit_enter();
-
 	// Solo remover de blocked_q si está BLOCKED
 	if (p->state == PROCESS_STATE_BLOCKED) {
 		process_queue_remove(&blocked_q, p);
@@ -259,8 +249,6 @@ void scheduler_unblock_process(process_t *p) {
 
 	if (current && p->priority > current->priority)
 		need_resched = 1;
-
-	sched_crit_exit();
 }
 
 void scheduler_finish_current(void) {
@@ -274,9 +262,7 @@ void scheduler_finish_current(void) {
 }
 
 process_t *scheduler_collect_finished(void) {
-	sched_crit_enter();
 	process_t *p = process_queue_pop(&finished_q);
-	sched_crit_exit();
 	return p;
 }
 
@@ -331,7 +317,6 @@ int scheduler_kill_by_pid(uint64_t pid) {
 	if (!p) {
 		return 0;
 	}
-	sched_crit_enter();
 
 	process_close_fds(p);
 
@@ -359,8 +344,6 @@ int scheduler_kill_by_pid(uint64_t pid) {
 	}
 	process_queue_push(&finished_q, p);
 
-	sched_crit_exit();
-
 	if (p == current)
 		need_resched = 1;
 
@@ -372,11 +355,9 @@ int scheduler_set_priority(uint64_t pid, uint8_t new_priority) {
 	if (!p || p == idle_p)
 		return 0;
 
-	sched_crit_enter();
 	uint8_t clamped = clamp_priority(new_priority);
 	int oldp = p->priority;
 	if (oldp == clamped) {
-		sched_crit_exit();
 		return 1;
 	}
 
@@ -396,7 +377,6 @@ int scheduler_set_priority(uint64_t pid, uint8_t new_priority) {
 	if (current && p->priority > current->priority)
 		need_resched = 1;
 
-	sched_crit_exit();
 	return 1;
 }
 
@@ -405,12 +385,9 @@ int scheduler_block_by_pid(uint64_t pid) {
 	if (!p || p == idle_p)
 		return 0;
 
-	sched_crit_enter();
-
 	if (p == current) {
 		current->state = PROCESS_STATE_BLOCKED;
 		need_resched = 1;
-		sched_crit_exit();
 		return 1;
 	}
 
@@ -421,12 +398,10 @@ int scheduler_block_by_pid(uint64_t pid) {
 		p->state = PROCESS_STATE_BLOCKED;
 		process_queue_push(&blocked_q, p);
 		need_resched = 1;
-		sched_crit_exit();
 		return 1;
 	}
 
 	// Si ya está bloqueado o terminado no hacemos nada
-	sched_crit_exit();
 	return 1;
 }
 
@@ -456,7 +431,6 @@ uint64_t scheduler_list_all_processes(process_info_t *buffer, uint64_t max_count
 		return 0;
 	}
 
-	sched_crit_enter();
 	uint64_t count = 0;
 
 	for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
@@ -490,16 +464,12 @@ uint64_t scheduler_list_all_processes(process_info_t *buffer, uint64_t max_count
 		}
 	}
 
-	sched_crit_exit();
 	return count;
 }
 
 uint64_t scheduler_get_foreground_pid(void) {
-	sched_crit_enter();
-
 	if (current && current != idle_p && current->is_foreground) {
 		uint64_t pid = current->pid;
-		sched_crit_exit();
 		return pid;
 	}
 
@@ -507,7 +477,6 @@ uint64_t scheduler_get_foreground_pid(void) {
 		for (process_t *p = ready_queues[pr].head; p; p = p->queue_next) {
 			if (p->is_foreground) {
 				uint64_t pid = p->pid;
-				sched_crit_exit();
 				return pid;
 			}
 		}
@@ -516,11 +485,9 @@ uint64_t scheduler_get_foreground_pid(void) {
 	for (process_t *p = blocked_q.head; p; p = p->queue_next) {
 		if (p->is_foreground) {
 			uint64_t pid = p->pid;
-			sched_crit_exit();
 			return pid;
 		}
 	}
 
-	sched_crit_exit();
 	return 0;
 }
