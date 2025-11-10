@@ -2,7 +2,6 @@
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #include <interrupts.h>
 #include <lib.h>
-#include <naiveConsole.h>
 #include <process.h>
 #include <scheduler.h>
 #include <semaphore.h>
@@ -74,7 +73,6 @@ int sem_close_by_id(uint64_t id) {
 	int ref = s->refcount;
 	release(&s->lock);
 	if (ref <= 0) {
-		// free: ensure no waiters
 		acquire(&s->lock);
 		s->used = 0;
 		s->wait_head = s->wait_tail = NULL;
@@ -120,13 +118,10 @@ int sem_wait_by_id(uint64_t id) {
 		release(&s->lock);
 		return 1;
 	}
-	// enqueue and mark waiting_on_sem
 	me->waiting_on_sem = s->id;
 	enqueue_waiter(s, me);
 	release(&s->lock);
 
-	// Marcar bloqueado y forzar cambio inmediato para que no continúe ejecutando
-	// hasta que el scheduler efectivamente lo mueva a la cola de bloqueados.
 	scheduler_block_current();
 	scheduler_yield_current();
 	return 1;
@@ -141,7 +136,6 @@ int sem_signal_by_id(uint64_t id) {
 	process_t *w = dequeue_waiter(s);
 	if (w) {
 		w->waiting_on_sem = 0;
-		// Unblock using scheduler helper
 		scheduler_unblock_process(w);
 	}
 	else {
@@ -159,7 +153,6 @@ int sem_set_by_id(uint64_t id, int newval) {
 		return 0;
 
 	acquire(&s->lock);
-	// wake up up to newval waiters
 	int awaken = 0;
 	while (awaken < newval) {
 		process_t *w = dequeue_waiter(s);

@@ -17,7 +17,6 @@
 typedef struct process_control_block process_t;
 typedef void (*process_entry_point_t)(void *);
 
-// Forward declaration para evitar dependencia circular
 typedef struct pipe_t pipe_t;
 
 typedef enum { FD_TYPE_TERMINAL = 0, FD_TYPE_PIPE_READ = 1, FD_TYPE_PIPE_WRITE = 2 } fd_type_t;
@@ -25,7 +24,7 @@ typedef enum { FD_TYPE_TERMINAL = 0, FD_TYPE_PIPE_READ = 1, FD_TYPE_PIPE_WRITE =
 typedef struct {
 	fd_type_t type;
 	union {
-		pipe_t *pipe; // NULL si es terminal
+		pipe_t *pipe;
 	};
 } fd_entry_t;
 
@@ -43,8 +42,8 @@ struct process_control_block {
 
 	process_state_t state;
 	int priority;
-	int base_priority;	 // Prioridad original antes de aging
-	uint64_t wait_ticks; // Contador para aging/anti-starvation
+	int base_priority;
+	uint64_t wait_ticks;
 
 	uint64_t rsp;
 	uint64_t rbp;
@@ -57,8 +56,7 @@ struct process_control_block {
 	process_entry_point_t entry_point;
 	void *entry_arg;
 	uint64_t waiting_on_pid;
-	int is_foreground; // 1 si está en foreground, 0 si está en background
-
+	int is_foreground;
 	process_t *parent;
 	process_t *first_child;
 	process_t *next_sibling;
@@ -68,12 +66,12 @@ struct process_control_block {
 	process_t *queue_prev;
 	process_t *waiters_head;
 	process_t *waiter_next;
-	/* Waiting on a semaphore (semaphore id) or 0 if none */
+
 	uint64_t waiting_on_sem;
-	/* Next pointer when enqueued on a semaphore wait queue */
+
 	process_t *sem_waiter_next;
 
-	/* File descriptors table */
+
 	fd_entry_t fds[MAX_FDS];
 };
 
@@ -101,7 +99,6 @@ void process_queue_push(process_queue_t *q, process_t *p);
 process_t *process_queue_pop(process_queue_t *q);
 int process_queue_is_empty(const process_queue_t *q);
 
-// Estructura para pasar información de procesos a userland
 #define MAX_PROCESS_INFO 64
 typedef struct {
 	uint64_t pid;
@@ -110,7 +107,7 @@ typedef struct {
 	int priority;
 	uint64_t rsp;
 	uint64_t rbp;
-	int foreground; // 1 si está corriendo (RUNNING), 0 caso contrario
+	int foreground;
 } process_info_t;
 
 #endif

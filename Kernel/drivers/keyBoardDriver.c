@@ -1,8 +1,6 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #include <keyboardDriver.h>
-#include <keystate.h>
-#include <naiveConsole.h>
 #include <scheduler.h>
 #include <semaphore.h>
 
@@ -182,6 +180,5 @@ static char scToAscii(uint8_t scancode) {
 
 uint8_t is_key_pressed(uint8_t scancode) {
 	// scancode es uint8_t (0-255), por lo que siempre es < 256
-	// La verificación es redundante pero se mantiene para claridad del código
 	return key_states[scancode];
 }

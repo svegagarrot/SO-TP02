@@ -3,7 +3,6 @@
 #include <defs.h>
 #include <idtLoader.h>
 #include <interrupts.h>
-#include <naiveConsole.h>
 #include <stdint.h>
 
 #pragma pack(push)

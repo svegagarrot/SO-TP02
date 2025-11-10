@@ -2,7 +2,6 @@
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #include <interrupts.h>
 #include <keyboardDriver.h>
-#include <naiveConsole.h>
 #include <process.h>
 #include <scheduler.h>
 #include <stdbool.h>
@@ -27,8 +26,6 @@ static uint64_t last_switch_tick = 0;
 
 
 static inline uint8_t clamp_priority(uint8_t pr) {
-	// pr es uint8_t, por lo que pr < PROCESS_PRIORITY_MIN (0) siempre es falso
-	// Se elimina la verificación redundante
 	if (pr > PROCESS_PRIORITY_MAX)
 		return PROCESS_PRIORITY_MAX;
 	return pr;
@@ -124,7 +121,7 @@ void init_scheduler(void) {
 	process_queue_init(&blocked_q);
 	process_queue_init(&finished_q);
 
-	idle_p = process_create("idle", idle_entry, NULL, NULL, 0, 0, 0); // idle no es foreground, sin pipes
+	idle_p = process_create("idle", idle_entry, NULL, NULL, 0, 0, 0);
 	if (idle_p) {
 		idle_p->state = PROCESS_STATE_RUNNING;
 		current = idle_p;
@@ -142,7 +139,6 @@ uint64_t schedule(uint64_t current_rsp) {
 	apply_aging();
 
 	bool quantum_expired = (now - last_switch_tick) >= QUANTUM_TICKS;
-	// current ya fue verificado como no-NULL en línea 130
 	bool must_switch = (current->state != PROCESS_STATE_RUNNING);
 
 	process_t *peek = NULL;
@@ -152,14 +148,10 @@ uint64_t schedule(uint64_t current_rsp) {
 			break;
 		}
 	}
-	// current ya fue verificado como no-NULL, la verificación !current es redundante pero segura
 	bool higher_pr_ready = peek && peek->priority > current->priority;
 
 	must_switch = must_switch || higher_pr_ready || quantum_expired || need_resched;
 
-	// Si no hay necesidad de cambiar y current está RUNNING, continuar con el mismo proceso
-	// La verificación current->state == PROCESS_STATE_RUNNING es redundante aquí porque
-	// si !must_switch, entonces current->state debe ser RUNNING (por la lógica anterior)
 	if (!must_switch) {
 		return current_rsp;
 	}
@@ -239,7 +231,6 @@ void scheduler_unblock_process(process_t *p) {
 		return;
 	}
 
-	// Solo remover de blocked_q si está BLOCKED
 	if (p->state == PROCESS_STATE_BLOCKED) {
 		process_queue_remove(&blocked_q, p);
 	}
@@ -278,24 +269,20 @@ static process_t *find_in_queue(process_queue_t *q, uint64_t pid) {
 process_t *scheduler_find_by_pid(uint64_t pid) {
 	process_t *p;
 
-	// Buscar en ready queues
 	for (int pr = PROCESS_PRIORITY_MIN; pr <= PROCESS_PRIORITY_MAX; ++pr) {
 		if ((p = find_in_queue(&ready_queues[pr], pid))) {
 			return p;
 		}
 	}
 
-	// Buscar en blocked queue
 	if ((p = find_in_queue(&blocked_q, pid))) {
 		return p;
 	}
 
-	// Buscar en finished queue
 	if ((p = find_in_queue(&finished_q, pid))) {
 		return p;
 	}
 
-	// Verificar si es el proceso actual
 	if (current && current->pid == pid) {
 		return current;
 	}
@@ -324,7 +311,6 @@ int scheduler_kill_by_pid(uint64_t pid) {
 		p->parent->is_foreground = 1;
 	}
 
-	// Remover de donde esté antes de mover a finished
 	if (p->state == PROCESS_STATE_READY) {
 		process_queue_remove(&ready_queues[p->priority], p);
 	}
@@ -361,7 +347,6 @@ int scheduler_set_priority(uint64_t pid, uint8_t new_priority) {
 		return 1;
 	}
 
-	// Si el proceso está READY, necesitamos moverlo de una ready queue a otra
 	if (p->state == PROCESS_STATE_READY) {
 		process_queue_remove(&ready_queues[oldp], p);
 	}
@@ -391,9 +376,7 @@ int scheduler_block_by_pid(uint64_t pid) {
 		return 1;
 	}
 
-	// Para cualquier otro proceso en estado READY, bloquearlo
 	if (p->state == PROCESS_STATE_READY) {
-		// Remover de la ready queue específica donde debería estar
 		process_queue_remove(&ready_queues[p->priority], p);
 		p->state = PROCESS_STATE_BLOCKED;
 		process_queue_push(&blocked_q, p);
@@ -401,7 +384,6 @@ int scheduler_block_by_pid(uint64_t pid) {
 		return 1;
 	}
 
-	// Si ya está bloqueado o terminado no hacemos nada
 	return 1;
 }
 

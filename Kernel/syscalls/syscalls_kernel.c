@@ -2,8 +2,6 @@
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 #include <interrupts.h>
 #include <keyboardDriver.h>
-#include <keystate.h>
-#include <lib.h>
 #include <mm.h>
 #include <pipe.h>
 #include <process.h>
@@ -28,22 +26,15 @@ uint64_t syscall_read(int fd, char *buffer, int count) {
 		return 0;
 	}
 
-	// Consultar tabla de file descriptors
 	fd_entry_t *fd_entry = &current_process->fds[fd];
 
-	// Leer según el tipo de FD
 	if (fd_entry->type == FD_TYPE_TERMINAL) {
-		// Leer de terminal (STDIN)
 		if (fd != STDIN) {
-			return 0; // Solo FD 0 puede leer de terminal
+			return 0;
 		}
 
-		// Verificar si el proceso actual está en foreground
 		if (!current_process->is_foreground) {
-			// Proceso en background no puede leer del teclado
-			// Lo bloqueamos automáticamente
 			scheduler_block_by_pid(current_process->pid);
-			// Después de bloquearse y despertar, devolvemos 0 (no hay datos)
 			return 0;
 		}
 
@@ -55,10 +46,7 @@ uint64_t syscall_read(int fd, char *buffer, int count) {
 				continue;
 			}
 
-			// Detectar EOF (Ctrl+D = 0x04)
 			if (c == 0x04) {
-				// Si no hemos leído nada, retornar 0 (EOF)
-				// Si ya leímos algo, retornar lo que tenemos
 				break;
 			}
 
@@ -69,14 +57,12 @@ uint64_t syscall_read(int fd, char *buffer, int count) {
 		return read;
 	}
 	else if (fd_entry->type == FD_TYPE_PIPE_READ) {
-		// Leer de pipe
 		if (!fd_entry->pipe) {
 			return 0;
 		}
 		return pipe_read(fd_entry->pipe, buffer, count);
 	}
 	else {
-		// FD_TYPE_PIPE_WRITE: no se puede leer de un pipe de escritura
 		return 0;
 	}
 }
@@ -91,14 +77,11 @@ uint64_t syscall_write(int fd, const char *buffer, int count) {
 		return 0;
 	}
 
-	// Consultar tabla de file descriptors
 	fd_entry_t *fd_entry = &current_process->fds[fd];
 
-	// Escribir según el tipo de FD
 	if (fd_entry->type == FD_TYPE_TERMINAL) {
-		// Escribir a terminal (STDOUT)
 		if (fd != STDOUT) {
-			return 0; // Solo FD 1 puede escribir a terminal
+			return 0;
 		}
 
 		for (int i = 0; i < count; i++) {
@@ -108,14 +91,12 @@ uint64_t syscall_write(int fd, const char *buffer, int count) {
 		return count;
 	}
 	else if (fd_entry->type == FD_TYPE_PIPE_WRITE) {
-		// Escribir a pipe
 		if (!fd_entry->pipe) {
 			return 0;
 		}
 		return pipe_write(fd_entry->pipe, buffer, count);
 	}
 	else {
-		// FD_TYPE_PIPE_READ: no se puede escribir a un pipe de lectura
 		return 0;
 	}
 }
@@ -190,24 +171,14 @@ uint64_t syscall_meminfo(uint64_t user_addr, uint64_t unused1, uint64_t unused2,
 
 uint64_t syscall_create_process(char *name, void *function, char *argv[], uint64_t priority,
 								uint64_t is_foreground_and_pipes) {
-	// Desempaquetar parámetros:
-	// Bits 0-31: stdin_pipe_id
-	// Bits 32-63: stdout_pipe_id (solo si el bit más alto de is_foreground == 1, sino es is_foreground)
-	// Si is_foreground_and_pipes <= 1, entonces es el viejo formato (solo is_foreground)
-
 	int is_foreground = 0;
 	uint64_t stdin_pipe_id = 0;
 	uint64_t stdout_pipe_id = 0;
 
 	if (is_foreground_and_pipes <= 1) {
-		// Formato viejo: solo is_foreground
 		is_foreground = (int) is_foreground_and_pipes;
 	}
 	else {
-		// Formato nuevo: empaquetado
-		// Bits 0-15: stdin_pipe_id
-		// Bits 16-31: stdout_pipe_id
-		// Bit 32: is_foreground
 		stdin_pipe_id = is_foreground_and_pipes & 0xFFFF;
 		stdout_pipe_id = (is_foreground_and_pipes >> 16) & 0xFFFF;
 		is_foreground = (is_foreground_and_pipes >> 32) & 0x1;
@@ -215,17 +186,15 @@ uint64_t syscall_create_process(char *name, void *function, char *argv[], uint64
 
 	process_t *parent = scheduler_current_process();
 
-	// Si el proceso hijo va a foreground, el padre debe perder foreground
 	if (is_foreground && parent) {
 		parent->is_foreground = 0;
 	}
 
 	process_t *p =
 		scheduler_spawn_process(name ? name : "user_process", (process_entry_point_t) function, (void *) argv,
-								parent, // Pasar el padre para poder restaurar foreground después
+								parent,
 								(uint8_t) priority, is_foreground, stdin_pipe_id, stdout_pipe_id);
 	if (!p) {
-		// Si falla, restaurar foreground del padre
 		if (is_foreground && parent) {
 			parent->is_foreground = 1;
 		}
@@ -273,7 +242,6 @@ uint64_t syscall_wait(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t
 		return 0;
 
 	if (target->state == PROCESS_STATE_FINISHED) {
-		// Si el hijo estaba en foreground, restaurar foreground del padre
 		process_t *me = scheduler_current_process();
 		if (me && target->is_foreground) {
 			me->is_foreground = 1;
@@ -282,7 +250,6 @@ uint64_t syscall_wait(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t
 	}
 
 	process_t *me = scheduler_current_process();
-	// me == NULL es redundante porque ya se verificó !me
 	if (!me || me == target)
 		return 0;
 
@@ -292,7 +259,6 @@ uint64_t syscall_wait(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t
 	scheduler_block_current();
 	scheduler_yield_current();
 
-	// Cuando el wait termine, restaurar foreground si el hijo lo tenía
 	if (target->is_foreground) {
 		me->is_foreground = 1;
 	}
@@ -352,7 +318,6 @@ uint64_t syscall_yield(uint64_t unused1, uint64_t unused2, uint64_t unused3, uin
 	return 1;
 }
 
-// Syscalls de pipes
 uint64_t syscall_pipe_create(uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4, uint64_t unused5) {
 	return pipe_create();
 }
@@ -371,8 +336,7 @@ uint64_t syscall_pipe_close(uint64_t pipe_id, uint64_t unused1, uint64_t unused2
 		return 0;
 	}
 
-	// Buscar el pipe en la tabla de FDs del proceso para determinar el tipo
-	int is_writer = 0; // Por defecto asumimos lector
+	int is_writer = 0;
 	int found = 0;
 
 	for (int i = 0; i < MAX_FDS; i++) {
@@ -387,8 +351,6 @@ uint64_t syscall_pipe_close(uint64_t pipe_id, uint64_t unused1, uint64_t unused2
 		}
 	}
 
-	// Si no encontramos el pipe en la tabla de FDs, asumimos escritor por compatibilidad
-	// (aunque esto no debería pasar en uso normal)
 	if (!found) {
 		is_writer = 1;
 	}
@@ -396,12 +358,7 @@ uint64_t syscall_pipe_close(uint64_t pipe_id, uint64_t unused1, uint64_t unused2
 	return pipe_close_by_id(pipe_id, is_writer);
 }
 
-// Asignar un pipe a un file descriptor específico
-// pipe_id: ID del pipe a asignar
-// fd: file descriptor donde asignar el pipe
-// mode: 0 para lectura, 1 para escritura
 uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t unused1, uint64_t unused2) {
-	// fd es uint64_t, por lo que fd < 0 siempre es falso
 	if (fd >= MAX_FDS) {
 		return 0;
 	}
@@ -411,7 +368,6 @@ uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t
 		return 0;
 	}
 
-	// Obtener el pipe
 	pipe_t *pipe = pipe_get_by_id(pipe_id);
 	if (!pipe) {
 		return 0;
@@ -419,12 +375,10 @@ uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t
 
 	fd_entry_t *entry = &current_process->fds[fd];
 
-	// Liberar pipe previo asociado a este descriptor (si lo hubiera)
 	if (entry->type == FD_TYPE_PIPE_READ || entry->type == FD_TYPE_PIPE_WRITE) {
 		if (entry->pipe) {
 			uint64_t old_id = pipe_get_id(entry->pipe);
 			if (old_id != 0) {
-				// Determinar si el pipe previo era escritor o lector
 				int is_writer = (entry->type == FD_TYPE_PIPE_WRITE) ? 1 : 0;
 				pipe_close_by_id(old_id, is_writer);
 			}
@@ -432,24 +386,19 @@ uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t
 		entry->pipe = NULL;
 	}
 
-	// Asignar el pipe al FD y abrir con el modo correcto
 	int is_writer_mode = 0;
 	if (mode == 0) {
-		// Modo lectura
 		entry->type = FD_TYPE_PIPE_READ;
 		is_writer_mode = 0;
 	}
 	else if (mode == 1) {
-		// Modo escritura
 		entry->type = FD_TYPE_PIPE_WRITE;
 		is_writer_mode = 1;
 	}
 	else {
-		// Modo inválido
 		return 0;
 	}
 
-	// Abrir el pipe con el modo correcto
 	if (!pipe_open_by_id(pipe_id, is_writer_mode)) {
 		return 0;
 	}
@@ -460,7 +409,6 @@ uint64_t syscall_pipe_dup(uint64_t pipe_id, uint64_t fd, uint64_t mode, uint64_t
 }
 
 uint64_t syscall_pipe_release_fd(uint64_t fd, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4) {
-	// fd es uint64_t, por lo que fd < 0 siempre es falso
 	if (fd >= MAX_FDS) {
 		return 0;
 	}
@@ -475,7 +423,6 @@ uint64_t syscall_pipe_release_fd(uint64_t fd, uint64_t unused1, uint64_t unused2
 		if (entry->pipe) {
 			uint64_t pipe_id = pipe_get_id(entry->pipe);
 			if (pipe_id != 0) {
-				// Determinar si es escritor o lector basado en el tipo de FD
 				int is_writer = (entry->type == FD_TYPE_PIPE_WRITE) ? 1 : 0;
 				pipe_close_by_id(pipe_id, is_writer);
 			}

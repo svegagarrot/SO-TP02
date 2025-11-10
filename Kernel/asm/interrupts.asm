@@ -252,7 +252,7 @@ haltcpu:
 	hlt
 	ret
 
-; process_start: llama entry (en r8) con rdi=arg y luego marca terminado
+; process_start: llama entry (en r8) con rdi=arg y marca terminado
 process_start:
     and     rsp, -16
     sub     rsp, 8   

@@ -1,6 +1,5 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-#include <interrupts.h>
 #include <mm.h>
 #include <pipe.h>
 #include <process.h>
@@ -18,13 +17,10 @@ static uint64_t next_pid = 1;
 static void copy_name(process_t *p, const char *name) {
 	const char *src = (name ? name : "proc");
 	size_t i = 0;
-	// Copiar hasta PROCESS_NAME_MAX_LEN-1 caracteres para dejar espacio para '\0'
 	while (i < PROCESS_NAME_MAX_LEN && src[i] != '\0') {
 		p->name[i] = src[i];
 		i++;
 	}
-	// Asegurar que el string termina en null
-	// i está garantizado <= PROCESS_NAME_MAX_LEN
 	if (i < sizeof(p->name)) {
 		p->name[i] = '\0';
 	}
@@ -83,7 +79,7 @@ process_t *process_create(const char *name, process_entry_point_t entry_point, v
 
 	if (stdin_pipe_id != 0) {
 		pipe_t *stdin_pipe = pipe_get_by_id(stdin_pipe_id);
-		if (stdin_pipe && pipe_open_by_id(stdin_pipe_id, 0)) { // is_writer=0 (lector)
+		if (stdin_pipe && pipe_open_by_id(stdin_pipe_id, 0)) {
 			p->fds[STDIN].type = FD_TYPE_PIPE_READ;
 			p->fds[STDIN].pipe = stdin_pipe;
 		}
@@ -91,7 +87,7 @@ process_t *process_create(const char *name, process_entry_point_t entry_point, v
 
 	if (stdout_pipe_id != 0) {
 		pipe_t *stdout_pipe = pipe_get_by_id(stdout_pipe_id);
-		if (stdout_pipe && pipe_open_by_id(stdout_pipe_id, 1)) { // is_writer=1 (escritor)
+		if (stdout_pipe && pipe_open_by_id(stdout_pipe_id, 1)) {
 			p->fds[STDOUT].type = FD_TYPE_PIPE_WRITE;
 			p->fds[STDOUT].pipe = stdout_pipe;
 		}
@@ -140,7 +136,6 @@ process_t *process_create(const char *name, process_entry_point_t entry_point, v
 	if (parent) {
 		p->parent = parent;
 		p->next_sibling = parent->first_child;
-		// prev_sibling ya está inicializado a NULL por memset, no es necesario reasignarlo
 		if (parent->first_child)
 			parent->first_child->prev_sibling = p;
 		parent->first_child = p;
@@ -259,7 +254,6 @@ void process_queue_push(process_queue_t *q, process_t *p) {
 	if (!q || !p)
 		return;
 
-	// Solo llamar detach_from_queue si el proceso parece estar en alguna cola
 	if (p->queue_next != NULL || p->queue_prev != NULL || q->head == p) {
 		detach_from_queue(q, p);
 	}

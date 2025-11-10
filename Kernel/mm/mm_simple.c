@@ -1,6 +1,5 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-#include <lib.h>
 #include <mm.h>
 #include <stdint.h>
 
@@ -19,11 +18,11 @@
 typedef struct block_header block_header_t;
 
 struct block_header {
-	uint64_t size_and_flags;   /* block size including header; LSB used as allocated flag */
-	block_header_t *prev_phys; /* previous block in physical order */
-	block_header_t *next_phys; /* next block in physical order */
-	block_header_t *prev_free; /* previous block in free list */
-	block_header_t *next_free; /* next block in free list */
+	uint64_t size_and_flags;
+	block_header_t *prev_phys;
+	block_header_t *next_phys;
+	block_header_t *prev_free;
+	block_header_t *next_free;
 };
 
 static block_header_t free_list_sentinel;
@@ -331,4 +330,4 @@ const char *mm_get_manager_name(void) {
 	return "simple";
 }
 
-#endif /* USE_SIMPLE_MM */
+#endif

@@ -23,13 +23,11 @@ uint64_t syscall_unblock(uint64_t pid, uint64_t unused1, uint64_t unused2, uint6
 uint64_t syscall_get_type_of_mm(uint64_t user_addr, uint64_t unused1, uint64_t unused2, uint64_t unused3,
 								uint64_t unused4);
 
-// Nuevas syscalls de procesos para test_prio
 uint64_t syscall_getpid(uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4, uint64_t unused5);
 uint64_t syscall_set_priority(uint64_t pid, uint64_t new_priority, uint64_t unused2, uint64_t unused3,
 							  uint64_t unused4);
 uint64_t syscall_wait(uint64_t pid, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4);
 
-// Semaphore syscalls
 uint64_t syscall_sem_create(int initial);
 uint64_t syscall_sem_open(uint64_t sem_id);
 uint64_t syscall_sem_close(uint64_t sem_id);
@@ -41,7 +39,6 @@ uint64_t syscall_list_processes(uint64_t user_addr, uint64_t max_count, uint64_t
 								uint64_t unused4);
 uint64_t syscall_yield(uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4, uint64_t unused5);
 
-// Pipe syscalls
 uint64_t syscall_pipe_create(uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4, uint64_t unused5);
 uint64_t syscall_pipe_open(uint64_t pipe_id, uint64_t is_writer, uint64_t unused2, uint64_t unused3, uint64_t unused4);
 uint64_t syscall_pipe_close(uint64_t pipe_id, uint64_t unused1, uint64_t unused2, uint64_t unused3, uint64_t unused4);

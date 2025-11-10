@@ -6,7 +6,6 @@
 
 typedef struct semaphore_t semaphore_t;
 
-// Kernel-facing API
 uint64_t sem_alloc(int initial_value);
 semaphore_t *sem_get_by_id(uint64_t id);
 int sem_open_by_id(uint64_t id);
