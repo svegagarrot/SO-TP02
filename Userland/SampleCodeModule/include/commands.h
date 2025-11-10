@@ -12,12 +12,12 @@
 
 typedef int (*cmd_fn)(int argc, char *argv[]);
 
-typedef struct{
-    const char *name;
-    cmd_fn function;
-    const char *help;
-    int is_builtin;  // 1 = built-in (no crear proceso), 0 = externo (crear proceso)
-}TShellCmd;
+typedef struct {
+	const char *name;
+	cmd_fn function;
+	const char *help;
+	int is_builtin; // 1 = built-in (no crear proceso), 0 = externo (crear proceso)
+} TShellCmd;
 
 extern const TShellCmd shellCmds[];
 
@@ -51,10 +51,10 @@ int filterCmd(int argc, char *argv[]);
 int mvarCmd(int argc, char *argv[]);
 
 // ===== command_parser.c =====
-int fillCommandAndArgs(char *args[], char *input);  
+int fillCommandAndArgs(char *args[], char *input);
 int CommandParse(char *commandInput);
-int64_t execute_external_command(const char *name, void *function, char *argv[], 
-                                  int is_foreground, uint64_t stdin_pipe_id, uint64_t stdout_pipe_id);
+int64_t execute_external_command(const char *name, void *function, char *argv[], int is_foreground,
+								 uint64_t stdin_pipe_id, uint64_t stdout_pipe_id);
 void *get_process_entry_function(int cmd_idx);
 
 // ===== process_wrappers.c =====

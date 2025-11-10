@@ -1,14 +1,14 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
-#include <lib.h>
-#include <moduleLoader.h>
-#include <keyboardDriver.h>
-#include <scheduler.h>
-#include <mm.h>
 #include <idtLoader.h>
-#include <process.h>
 #include <interrupts.h>
+#include <keyboardDriver.h>
+#include <lib.h>
+#include <mm.h>
+#include <moduleLoader.h>
 #include <pipe.h>
+#include <process.h>
+#include <scheduler.h>
 
 extern uint8_t text;
 extern uint8_t rodata;
@@ -19,59 +19,50 @@ extern uint8_t endOfKernel;
 
 static const uint64_t PageSize = 0x1000;
 
-static void * const sampleCodeModuleAddress = (void*)0x400000;
-static void * const sampleDataModuleAddress = (void*)0x500000;
+static void *const sampleCodeModuleAddress = (void *) 0x400000;
+static void *const sampleDataModuleAddress = (void *) 0x500000;
 
 typedef int (*EntryPoint)();
 
-void clearBSS(void * bssAddress, uint64_t bssSize)
-{
-    memset(bssAddress, 0, bssSize);
+void clearBSS(void *bssAddress, uint64_t bssSize) {
+	memset(bssAddress, 0, bssSize);
 }
 
-void * getStackBase()
-{
-    return (void*)(uintptr_t)(
-        (uint64_t)&endOfKernel
-        + PageSize * 8
-        - sizeof(uint64_t)
-    );
+void *getStackBase() {
+	return (void *) (uintptr_t) ((uint64_t) &endOfKernel + PageSize * 8 - sizeof(uint64_t));
 }
 
-void idle(){
-	while(1){
+void idle() {
+	while (1) {
 		_hlt();
 	}
 }
 
-void * initializeKernelBinary()
-{
-    void * moduleAddresses[] = {
-        sampleCodeModuleAddress,
-        sampleDataModuleAddress
-    };
+void *initializeKernelBinary() {
+	void *moduleAddresses[] = {sampleCodeModuleAddress, sampleDataModuleAddress};
 
-    loadModules((&endOfKernelBinary), moduleAddresses);
+	loadModules((&endOfKernelBinary), moduleAddresses);
 
-    clearBSS(&bss, (uint64_t)(uintptr_t)&endOfKernel - (uint64_t)(uintptr_t)&bss);
+	clearBSS(&bss, (uint64_t) (uintptr_t) &endOfKernel - (uint64_t) (uintptr_t) &bss);
 
-    return getStackBase();
+	return getStackBase();
 }
 
-int main()
-{   
+int main() {
 	_cli();
 	mm_init_default();
 	init_scheduler();
 	pipe_system_init();
-    keyboard_init();
+	keyboard_init();
 
-	scheduler_spawn_process("shell", (void*)sampleCodeModuleAddress, NULL, NULL, 2, 1, 0, 0);
+	scheduler_spawn_process("shell", (void *) sampleCodeModuleAddress, NULL, NULL, 2, 1, 0, 0);
 
-    load_idt();
+	load_idt();
 	_sti();
 
-	while(1){ _hlt(); }
+	while (1) {
+		_hlt();
+	}
 
-    return 0;
+	return 0;
 }

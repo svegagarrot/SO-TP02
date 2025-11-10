@@ -1,10 +1,10 @@
 #ifndef KEYBOARDDRIVER_H
 #define KEYBOARDDRIVER_H
 
-#include <stdint.h>
-#include <stddef.h>
-#include <interrupts.h> 
+#include <interrupts.h>
 #include <registers.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #define ESC 0x1B
 #define BACKSPACE 0x0E
@@ -20,31 +20,31 @@
 #define MAX_SCANCODE 0x58
 #define BUFFER_SIZE 256
 
-#define KEY_ARROW_UP     0x80
-#define KEY_ARROW_DOWN   0x81
-#define KEY_ARROW_LEFT   0x82
-#define KEY_ARROW_RIGHT  0x83
+#define KEY_ARROW_UP 0x80
+#define KEY_ARROW_DOWN 0x81
+#define KEY_ARROW_LEFT 0x82
+#define KEY_ARROW_RIGHT 0x83
 #define SC_DELETE 0x53
 #define KEY_DELETE 0x84
 
-#define SC_UP     0x48
-#define SC_DOWN   0x50
-#define SC_LEFT   0x4B
-#define SC_RIGHT  0x4D
-#define SC_SPACE  0x39
-#define SC_TAB    0x0F
+#define SC_UP 0x48
+#define SC_DOWN 0x50
+#define SC_LEFT 0x4B
+#define SC_RIGHT 0x4D
+#define SC_SPACE 0x39
+#define SC_TAB 0x0F
 #define CTRL_R_CODE 0x12
 
 extern uint8_t getScanCode();
 
-/* Manejador de interrupciones para el teclado, 
+/* Manejador de interrupciones para el teclado,
  * se ejecuta cuando el teclado genera una interrupcion
-*/
+ */
 void keyboard_interrupt_handler();
 
-/* 
+/*
  * Devuelve un caracter desde el buffer del teclado o 0 si el buffer esta vacio
-*/
+ */
 char keyboard_read_getchar();
 
 /* Inicializa el subsistema de teclado (semáforos, buffers, etc.) */
@@ -57,5 +57,4 @@ void keyboard_wait_for_char(void);
  * Se llama cuando se mata un proceso foreground con Ctrl+C */
 void keyboard_clear_buffer(void);
 
-
-#endif 
+#endif

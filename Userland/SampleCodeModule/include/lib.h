@@ -4,26 +4,26 @@
 #define BUFFER_SIZE 256
 // Nota: stdin se define como NULL para compatibilidad con fgets en bare metal
 // En nuestro sistema, fgets ignora este parámetro y lee directamente de fd 0
-#define stdin ((FILE*)(uintptr_t)0) 
+#define stdin ((FILE *) (uintptr_t) 0)
 
-#include <stdint.h>
-#include <stddef.h>
 #include <math.h>
+#include <stddef.h>
+#include <stdint.h>
 
 // Definición de FILE para compatibilidad con bare metal
 // Usamos un nombre interno para evitar conflicto con definiciones estándar
 typedef struct _BareMetal_FILE {
-    int _unused;  // Campo ficticio para que la estructura no esté vacía
+	int _unused; // Campo ficticio para que la estructura no esté vacía
 } FILE;
 
 typedef struct {
-    uint64_t total_bytes;
-    uint64_t used_bytes;
-    uint64_t free_bytes;
-    uint64_t largest_free_block;
-    uint64_t allocations;
-    uint64_t frees;
-    uint64_t failed_allocations;
+	uint64_t total_bytes;
+	uint64_t used_bytes;
+	uint64_t free_bytes;
+	uint64_t largest_free_block;
+	uint64_t allocations;
+	uint64_t frees;
+	uint64_t failed_allocations;
 } memory_info_t;
 
 // Estados de proceso
@@ -37,13 +37,13 @@ typedef struct {
 #define MAX_PROCESS_INFO 64
 
 typedef struct {
-    uint64_t pid;
-    char name[PROCESS_NAME_MAX_LEN + 1];
-    int state;
-    int priority;
-    uint64_t rsp;
-    uint64_t rbp;
-    int foreground;
+	uint64_t pid;
+	char name[PROCESS_NAME_MAX_LEN + 1];
+	int state;
+	int priority;
+	uint64_t rsp;
+	uint64_t rbp;
+	int foreground;
 } process_info_t;
 
 int putchar(int c);
@@ -70,7 +70,8 @@ char *toLower(char *str);
 void shutdown();
 int getScreenDims(uint64_t *width, uint64_t *height);
 int64_t my_create_process(char *name, void *function, char *argv[], uint64_t priority, int is_foreground);
-int64_t my_create_process_with_pipes(char *name, void *function, char *argv[], uint64_t priority, int is_foreground, uint64_t stdin_pipe_id, uint64_t stdout_pipe_id);
+int64_t my_create_process_with_pipes(char *name, void *function, char *argv[], uint64_t priority, int is_foreground,
+									 uint64_t stdin_pipe_id, uint64_t stdout_pipe_id);
 int64_t my_kill(uint64_t pid);
 int64_t my_block(uint64_t pid);
 int64_t my_unblock(uint64_t pid);

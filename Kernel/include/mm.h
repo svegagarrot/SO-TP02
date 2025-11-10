@@ -1,17 +1,17 @@
 #ifndef MM_H
 #define MM_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 typedef struct {
-    uint64_t total_bytes;
-    uint64_t used_bytes;
-    uint64_t free_bytes;
-    uint64_t largest_free_block;
-    uint64_t allocations;
-    uint64_t frees;
-    uint64_t failed_allocations;
+	uint64_t total_bytes;
+	uint64_t used_bytes;
+	uint64_t free_bytes;
+	uint64_t largest_free_block;
+	uint64_t allocations;
+	uint64_t frees;
+	uint64_t failed_allocations;
 } mm_stats_t;
 
 void mm_init(void *heap_start, uint64_t heap_size);

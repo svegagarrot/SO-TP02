@@ -1,8 +1,8 @@
 #ifndef SEMAPHORE_H
 #define SEMAPHORE_H
 
-#include <stdint.h>
 #include <process.h>
+#include <stdint.h>
 
 typedef struct semaphore_t semaphore_t;
 

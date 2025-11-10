@@ -1,9 +1,9 @@
 #ifndef EXCEPTIONS_H
 #define EXCEPTIONS_H
 
+#include <lib.h>
 #include <stdint.h>
 #include <videoDriver.h>
-#include <lib.h>
 
 #define ZERO_EXCEPTION_ID 0
 #define INVALID_OPCODE_ID 6

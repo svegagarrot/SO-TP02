@@ -7,6 +7,7 @@ RUN apt install -y \
       make \
       gcc-x86-64-linux-gnu \
       binutils-x86-64-linux-gnu \
-      qemu-utils
+      qemu-utils \
+      clang-format
 
 WORKDIR /src
