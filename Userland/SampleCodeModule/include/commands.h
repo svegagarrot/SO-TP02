@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define MAX_ARGS 4
+#define MAX_ARGS 32
 #define OK 0
 #define ERROR -1
 #define EXIT_CODE 1
