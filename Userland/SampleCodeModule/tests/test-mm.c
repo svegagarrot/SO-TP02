@@ -51,7 +51,7 @@ uint64_t test_mm(uint64_t argc, char *argv[]) {
 			}
 		}
 
-		printf("Asignados %u bloques (%u bytes) - ", (unsigned int) rq, (unsigned int) total);
+		printf("Asignados %llu bloques (%llu bytes) - ", (unsigned long long) rq, (unsigned long long) total);
 
 		// Set
 		uint32_t i;

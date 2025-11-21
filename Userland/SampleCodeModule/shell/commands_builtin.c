@@ -66,31 +66,34 @@ int exceptionCmd(int argc, char *argv[]) {
 }
 
 int killCmd(int argc, char *argv[]) {
-	if (argc != 2) {
-		printf("Uso: kill <pid>\n");
-		return CMD_ERROR;
-	}
-
-	int64_t pid = atoi(argv[1]);
-	if (pid <= 0) {
-		printf("Error: PID invalido.\n");
+	if (argc < 2) {
+		printf("Uso: kill <pid1> <pid2> ...\n");
 		return CMD_ERROR;
 	}
 
 	int64_t current_pid = my_getpid();
-	if (pid == current_pid || pid == SHELL_PID) {
-		printf("Error: no se puede matar el proceso de la shell.\n");
-		return CMD_ERROR;
+	int error_count = 0;
+	for (int i = 1; i < argc; i++) {
+		int64_t pid = atoi(argv[i]);
+		if (pid <= 0) {
+			printf("Error: PID invalido (%s).\n", argv[i]);
+			error_count++;
+			continue;
+		}
+		if (pid == current_pid || pid == SHELL_PID) {
+			printf("Error: no se puede matar el proceso de la shell (PID %lld).\n", pid);
+			error_count++;
+			continue;
+		}
+		int64_t result = my_kill(pid);
+		if (result == 0) {
+			printf("Error: no se pudo matar el proceso %lld. Puede que no exista.\n", pid);
+			error_count++;
+		} else {
+			printf("Proceso %lld terminado exitosamente.\n", pid);
+		}
 	}
-
-	int64_t result = my_kill(pid);
-	if (result == 0) {
-		printf("Error: no se pudo matar el proceso %lld. Puede que no exista.\n", pid);
-		return CMD_ERROR;
-	}
-
-	printf("Proceso %lld terminado exitosamente.\n", pid);
-	return OK;
+	return (error_count == (argc-1)) ? CMD_ERROR : OK;
 }
 
 int niceCmd(int argc, char *argv[]) {
