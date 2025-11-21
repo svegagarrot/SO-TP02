@@ -193,3 +193,12 @@ int64_t my_sem_close(char *sem_id) {
 	user_sem_ids[idx] = 0;
 	return res;
 }
+
+int64_t my_sem_set_random(char *sem_id, int enable) {
+	if (!sem_id)
+		return 0;
+	int idx = find_sem_index(sem_id);
+	if (idx < 0)
+		return 0;
+	return (int64_t) sys_sem_set_random(user_sem_ids[idx], enable);
+}

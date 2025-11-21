@@ -235,8 +235,8 @@ void mvar_writer_entry(void *arg) {
 	}
 
 	while (1) {
-		int random_wait = (writer_id * 13) % 500 + 100;
-		sleep(random_wait);
+		int wait_time = 200;
+		sleep(wait_time);
 
 		my_sem_wait(sem_empty);
 		my_sem_wait(sem_mutex);
@@ -328,9 +328,8 @@ void mvar_reader_entry(void *arg) {
 	uint32_t my_color = reader_colors[reader_id % num_colors];
 
 	while (1) {
-		int random_wait = (reader_id * 17) % 500 + 100;
-		sleep(random_wait);
-
+		int wait_time = 200;
+		sleep(wait_time);
 		
 		my_sem_wait(sem_full);
 		my_sem_wait(sem_mutex);
@@ -342,7 +341,6 @@ void mvar_reader_entry(void *arg) {
 			sys_video_putChar(read_value, my_color, 0x000000);
 		}
 		my_sem_post(sem_mutex);
-
 		my_sem_post(sem_empty);
 	}
 }

@@ -19,6 +19,7 @@ typedef struct semaphore_t {
 	process_t *wait_head;
 	process_t *wait_tail;
 	int used;
+	int random_dequeue; // flag para activar dequeue aleatorio
 } semaphore_t;
 
 static semaphore_t semaphores[MAX_SEMAPHORES];
@@ -48,6 +49,7 @@ uint64_t sem_alloc(int initial_value) {
 			s->refcount = 1;
 			s->lock = 0;
 			s->wait_head = s->wait_tail = NULL;
+			s->random_dequeue = 0; // por defecto FIFO
 			return s->id;
 		}
 	}
@@ -92,7 +94,85 @@ static void enqueue_waiter(semaphore_t *s, process_t *p) {
 	}
 }
 
+static process_t *dequeue_waiter_random(semaphore_t *s) {
+	if (!s->wait_head)
+		return NULL;
+	
+	// contar cuantos procesos estan esperando
+	int count = 0;
+	process_t *p = s->wait_head;
+	while (p) {
+		count++;
+		p = p->sem_waiter_next;
+	}
+	
+	if (count == 0)
+		return NULL;
+	
+	// si solo hay uno, devolverlo directamente
+	if (count == 1) {
+		p = s->wait_head;
+		s->wait_head = s->wait_tail = NULL;
+		p->sem_waiter_next = NULL;
+		return p;
+	}
+	
+	// generar un indice pseudo-aleatorio 
+	extern uint64_t ticks_elapsed(void);
+	extern process_t *scheduler_current_process(void);
+	
+	static uint64_t random_state = 123456789UL;
+	
+	uint64_t seed = ticks_elapsed();
+	
+	// mezclar con el PID del proceso actual si existe
+	process_t *current = scheduler_current_process();
+	if (current) {
+		seed ^= (current->pid << 16);
+		seed ^= (uint64_t)current->rsp;
+	}
+	
+	// mezclar con la dirección del semáforo
+	seed ^= (uint64_t)s;
+	
+	// mezclar con el estado anterior
+	seed ^= random_state;
+	
+	seed = (seed * 1103515245UL + 12345);
+	random_state = seed; // actualizar estado para la prox vez
+	
+	int target_index = (seed >> 16) % count; // usar bits medios para mejor dsitribucioin
+	
+	// ir hasta el proceso target_index
+	process_t *prev = NULL;
+	p = s->wait_head;
+	for (int i = 0; i < target_index; i++) {
+		prev = p;
+		p = p->sem_waiter_next;
+	}
+	
+	// borrar el proceso de la lista
+	if (prev) {
+		prev->sem_waiter_next = p->sem_waiter_next;
+	} else {
+		s->wait_head = p->sem_waiter_next;
+	}
+	
+	if (p == s->wait_tail) {
+		s->wait_tail = prev;
+	}
+	
+	p->sem_waiter_next = NULL;
+	return p;
+}
+
 static process_t *dequeue_waiter(semaphore_t *s) {
+	// usar dequeue aleatorio solo si esta activado para este sem
+	if (s->random_dequeue) {
+		return dequeue_waiter_random(s);
+	}
+	
+	// deque fifo normal
 	process_t *p = s->wait_head;
 	if (!p)
 		return NULL;
@@ -173,6 +253,16 @@ int sem_get_value_by_id(uint64_t id, int *out) {
 		return 0;
 	acquire(&s->lock);
 	*out = s->value;
+	release(&s->lock);
+	return 1;
+}
+
+int sem_set_random_dequeue(uint64_t id, int enable) {
+	semaphore_t *s = sem_get_by_id(id);
+	if (!s)
+		return 0;
+	acquire(&s->lock);
+	s->random_dequeue = enable ? 1 : 0;
 	release(&s->lock);
 	return 1;
 }

@@ -77,6 +77,7 @@ int64_t my_sem_open(char *sem_id, uint64_t initialValue);
 int64_t my_sem_wait(char *sem_id);
 int64_t my_sem_post(char *sem_id);
 int64_t my_sem_close(char *sem_id);
+int64_t my_sem_set_random(char *sem_id, int enable);
 int64_t my_yield();
 int get_type_of_mm(char *buf, int buflen);
 uint64_t list_processes(process_info_t *buffer, uint64_t max_count);
