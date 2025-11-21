@@ -94,10 +94,6 @@ int mvarCmd(int argc, char *argv[]) {
 		return CMD_ERROR;
 	}
 
-	my_sem_set_random(sem_empty, 1);
-	my_sem_set_random(sem_full, 1);
-	my_sem_set_random(sem_mutex, 1);
-
 	uint64_t pipe_id = pipe_create();
 	if (pipe_id == 0) {
 		printf("Error: no se pudo crear el pipe.\n");

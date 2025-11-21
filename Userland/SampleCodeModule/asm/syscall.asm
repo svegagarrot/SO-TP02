@@ -25,7 +25,6 @@ GLOBAL sys_sem_wait
 GLOBAL sys_sem_signal
 GLOBAL sys_sem_set
 GLOBAL sys_sem_get
-GLOBAL sys_sem_set_random
 GLOBAL sys_list_processes
 GLOBAL sys_yield
 GLOBAL sys_pipe_create
@@ -260,7 +259,7 @@ sys_sem_get:
     pop rbp
     ret
 
-sys_sem_set_random:
+sys_list_processes:
     push rbp
     mov rbp, rsp
     mov rax, 25
@@ -269,7 +268,7 @@ sys_sem_set_random:
     pop rbp
     ret
 
-sys_list_processes:
+sys_yield:
     push rbp
     mov rbp, rsp
     mov rax, 26
@@ -278,7 +277,7 @@ sys_list_processes:
     pop rbp
     ret
 
-sys_yield:
+sys_pipe_create:
     push rbp
     mov rbp, rsp
     mov rax, 27
@@ -287,7 +286,7 @@ sys_yield:
     pop rbp
     ret
 
-sys_pipe_create:
+sys_pipe_open:
     push rbp
     mov rbp, rsp
     mov rax, 28
@@ -296,7 +295,7 @@ sys_pipe_create:
     pop rbp
     ret
 
-sys_pipe_open:
+sys_pipe_close:
     push rbp
     mov rbp, rsp
     mov rax, 29
@@ -305,7 +304,7 @@ sys_pipe_open:
     pop rbp
     ret
 
-sys_pipe_close:
+sys_pipe_dup:
     push rbp
     mov rbp, rsp
     mov rax, 30
@@ -314,7 +313,7 @@ sys_pipe_close:
     pop rbp
     ret
 
-sys_pipe_dup:
+sys_pipe_release_fd:
     push rbp
     mov rbp, rsp
     mov rax, 31
@@ -323,19 +322,10 @@ sys_pipe_dup:
     pop rbp
     ret
 
-sys_pipe_release_fd:
-    push rbp
-    mov rbp, rsp
-    mov rax, 32
-    int 0x80
-    mov rsp, rbp
-    pop rbp
-    ret
-
 sys_get_foreground_pid:
     push rbp
     mov rbp, rsp
-    mov rax, 33
+    mov rax, 32
     int 0x80
     mov rsp, rbp
     pop rbp

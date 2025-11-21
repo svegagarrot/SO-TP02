@@ -14,6 +14,5 @@ int sem_wait_by_id(uint64_t id);
 int sem_signal_by_id(uint64_t id);
 int sem_set_by_id(uint64_t id, int newval);
 int sem_get_value_by_id(uint64_t id, int *out);
-int sem_set_random_dequeue(uint64_t id, int enable);
 
 #endif

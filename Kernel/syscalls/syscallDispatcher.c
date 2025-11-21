@@ -30,7 +30,6 @@ static SyscallHandler syscallHandlers[] = {
 	(SyscallHandler) syscall_sem_signal,
 	(SyscallHandler) syscall_sem_set,
 	(SyscallHandler) syscall_sem_get,
-	(SyscallHandler) syscall_sem_set_random,
 	(SyscallHandler) syscall_list_processes,
 	(SyscallHandler) syscall_yield,
 	(SyscallHandler) syscall_pipe_create,
