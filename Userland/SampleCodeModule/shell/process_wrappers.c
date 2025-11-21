@@ -4,6 +4,7 @@
 #include "../include/lib.h"
 #include "../include/shell.h"
 #include "../include/syscall.h"
+#include "../tests/test_util.h"
 
 extern int64_t test_mm(uint64_t argc, char *argv[]);
 extern int64_t test_processes(uint64_t argc, char *argv[]);
@@ -12,6 +13,14 @@ extern uint64_t test_sync(uint64_t argc, char *argv[]);
 
 #define STDIN_FD 0
 #define STDOUT_FD 1
+
+static void delay_loop(int amount) {
+	if (amount <= 0) {
+		amount = 1;
+	}
+	uint32_t random_variance = GetUniform(160000000);
+	bussy_wait((uint64_t)amount * (240000000 + random_variance));
+}
 
 const char *state_to_string(int state) {
 	switch (state) {
@@ -182,86 +191,108 @@ void filter_process_entry(void *arg) {
 
 void mvar_writer_entry(void *arg) {
 	char **argv = (char **) arg;
+	if (argv == NULL || argv[0] == NULL) {
+		return;
+	}
+
 	char writer_id = argv[0][0];
-	char sem_empty[32];
-	char sem_full[32];
-	char sem_mutex[32];
+	char slots[32];
+	char items[32];
+	char mutex[32];
 	uint64_t pipe_id;
+	int delay;
 
 	int i = 0;
-	while (i < 31 && argv[1][i] != '\0') {
-		sem_empty[i] = argv[1][i];
+	while (i < 31 && argv[1] != NULL && argv[1][i] != '\0') {
+		slots[i] = argv[1][i];
 		i++;
 	}
-	sem_empty[i] = '\0';
+	slots[i] = '\0';
 
 	i = 0;
-	while (i < 31 && argv[2][i] != '\0') {
-		sem_full[i] = argv[2][i];
+	while (i < 31 && argv[2] != NULL && argv[2][i] != '\0') {
+		items[i] = argv[2][i];
 		i++;
 	}
-	sem_full[i] = '\0';
+	items[i] = '\0';
 
 	i = 0;
-	while (i < 31 && argv[3][i] != '\0') {
-		sem_mutex[i] = argv[3][i];
+	while (i < 31 && argv[3] != NULL && argv[3][i] != '\0') {
+		mutex[i] = argv[3][i];
 		i++;
 	}
-	sem_mutex[i] = '\0';
+	mutex[i] = '\0';
 
 	pipe_id = 0;
 	i = 0;
-	while (argv[4][i] != '\0') {
-		pipe_id = pipe_id * 10 + (argv[4][i] - '0');
-		i++;
+	if (argv[4] != NULL) {
+		while (argv[4][i] != '\0') {
+			pipe_id = pipe_id * 10 + (argv[4][i] - '0');
+			i++;
+		}
 	}
 
-	free(argv[0]);
-	free(argv[1]);
-	free(argv[2]);
-	free(argv[3]);
-	free(argv[4]);
+	delay = 1;
+	if (argv[5] != NULL) {
+		delay = atoi(argv[5]);
+		if (delay <= 0) {
+			delay = 1;
+		}
+	}
+
+	for (int j = 0; j < 6; j++) {
+		if (argv[j] != NULL) {
+			free(argv[j]);
+		}
+	}
 	free(argv);
 
 	if (!pipe_open(pipe_id)) {
-		printf("Escritor %c: no pudo abrir el pipe %llu\n", writer_id, pipe_id);
 		return;
 	}
 
 	const int write_fd = 2;
 	if (!pipe_dup(pipe_id, write_fd, 1)) {
-		printf("Escritor %c: no pudo conectar el pipe\n", writer_id);
-		return; 
+		return;
 	}
 
 	while (1) {
-		int random_wait = (writer_id * 13) % 500 + 100;
-		sleep(random_wait);
+		delay_loop(delay);
 
-		my_sem_wait(sem_empty);
-		my_sem_wait(sem_mutex);
+		if (my_sem_wait(slots) == -1) {
+			break;
+		}
 
+		if (my_sem_wait(mutex) == -1) {
+			my_sem_post(slots);
+			break;
+		}
+
+		// Escribir exactamente 1 byte al pipe
 		int written = sys_write(write_fd, &writer_id, 1);
 		if (written == 1) {
-			my_sem_post(sem_mutex);
-			my_sem_post(sem_full);
-		}
-		else {
-			my_sem_post(sem_mutex);
-			my_sem_post(sem_empty);
+			my_sem_post(mutex);
+			my_sem_post(items);
+		} else {
+			my_sem_post(mutex);
+			my_sem_post(slots);
 		}
 	}
 }
 
 void mvar_reader_entry(void *arg) {
 	char **argv = (char **) arg;
-	int reader_id;
-	char sem_empty[32];
-	char sem_full[32];
-	char sem_mutex[32];
-	uint64_t pipe_id;
+	if (argv == NULL || argv[0] == NULL) {
+		return;
+	}
 
-	reader_id = 0;
+	int reader_id = 0;
+	char items[32];
+	char slots[32];
+	char mutex[32];
+	uint64_t pipe_id;
+	int delay;
+
 	int i = 0;
 	while (argv[0][i] != '\0') {
 		reader_id = reader_id * 10 + (argv[0][i] - '0');
@@ -269,81 +300,93 @@ void mvar_reader_entry(void *arg) {
 	}
 
 	i = 0;
-	while (i < 31 && argv[1][i] != '\0') {
-		sem_empty[i] = argv[1][i];
+	while (i < 31 && argv[1] != NULL && argv[1][i] != '\0') {
+		items[i] = argv[1][i];
 		i++;
 	}
-	sem_empty[i] = '\0';
+	items[i] = '\0';
 
 	i = 0;
-	while (i < 31 && argv[2][i] != '\0') {
-		sem_full[i] = argv[2][i];
+	while (i < 31 && argv[2] != NULL && argv[2][i] != '\0') {
+		slots[i] = argv[2][i];
 		i++;
 	}
-	sem_full[i] = '\0';
+	slots[i] = '\0';
 
 	i = 0;
-	while (i < 31 && argv[3][i] != '\0') {
-		sem_mutex[i] = argv[3][i];
+	while (i < 31 && argv[3] != NULL && argv[3][i] != '\0') {
+		mutex[i] = argv[3][i];
 		i++;
 	}
-	sem_mutex[i] = '\0';
+	mutex[i] = '\0';
 
-	// Parsear pipe_id
 	pipe_id = 0;
 	i = 0;
-	while (argv[4][i] != '\0') {
-		pipe_id = pipe_id * 10 + (argv[4][i] - '0');
-		i++;
+	if (argv[4] != NULL) {
+		while (argv[4][i] != '\0') {
+			pipe_id = pipe_id * 10 + (argv[4][i] - '0');
+			i++;
+		}
 	}
 
-	// Liberar memoria
-	free(argv[0]);
-	free(argv[1]);
-	free(argv[2]);
-	free(argv[3]);
-	free(argv[4]);
+	delay = 1;
+	if (argv[5] != NULL) {
+		delay = atoi(argv[5]);
+		if (delay <= 0) {
+			delay = 1;
+		}
+	}
+
+	for (int j = 0; j < 6; j++) {
+		if (argv[j] != NULL) {
+			free(argv[j]);
+		}
+	}
 	free(argv);
 
 	if (!pipe_open(pipe_id)) {
-		printf("Lector %d: no pudo abrir el pipe %llu\n", reader_id, pipe_id);
 		return;
 	}
 
 	const int read_fd = 2;
-	if (!pipe_dup(pipe_id, read_fd, 0)) { 
-		printf("Lector %d: no pudo conectar el pipe\n", reader_id);
-		return; 
+	if (!pipe_dup(pipe_id, read_fd, 0)) {
+		return;
 	}
 
 	uint32_t reader_colors[] = {
-		0xFF0000, // Rojo - Lector 0
+		0x0000FF, // Azul - Lector 0
 		0x00FF00, // Verde - Lector 1
-		0x0080FF, // Azul claro - Lector 2
-		0xFFFF00, // Amarillo - Lector 3
+		0xFF0000, // Rojo - Lector 2
+		0x00FFFF, // Cyan - Lector 3
 		0xFF00FF, // Magenta - Lector 4
-		0x00FFFF, // Cyan - Lector 5
+		0xFFFF00, // Amarillo - Lector 5
 	};
 	int num_colors = 6;
 	uint32_t my_color = reader_colors[reader_id % num_colors];
 
 	while (1) {
-		int random_wait = (reader_id * 17) % 500 + 100;
-		sleep(random_wait);
+		delay_loop(delay);
 
-		
-		my_sem_wait(sem_full);
-		my_sem_wait(sem_mutex);
+		if (my_sem_wait(items) == -1) {
+			break;
+		}
+
+		if (my_sem_wait(mutex) == -1) {
+			my_sem_post(items);
+			break;
+		}
 
 		char read_value = '?';
 		int bytes_read = sys_read(read_fd, &read_value, 1);
 
 		if (bytes_read == 1) {
 			sys_video_putChar(read_value, my_color, 0x000000);
+			my_sem_post(mutex);
+			my_sem_post(slots);
+		} else {
+			my_sem_post(mutex);
+			my_sem_post(items);
 		}
-		my_sem_post(sem_mutex);
-
-		my_sem_post(sem_empty);
 	}
 }
 

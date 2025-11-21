@@ -65,41 +65,41 @@ int mvarCmd(int argc, char *argv[]) {
 	}
 
 	int64_t current_pid = my_getpid();
-	char sem_empty[32];
-	char sem_full[32];
-	char sem_mutex[32];
+	char suffix[32];
+	char slots[32];
+	char items[32];
+	char mutex[32];
 
-	sprintf(sem_empty, "mvar_e_%lld", current_pid);
-	sprintf(sem_full, "mvar_f_%lld", current_pid);
-	sprintf(sem_mutex, "mvar_m_%lld", current_pid);
+	sprintf(suffix, "%llx", current_pid);
+	sprintf(slots, "mvar_slots_%s", suffix);
+	sprintf(items, "mvar_items_%s", suffix);
+	sprintf(mutex, "mvar_mutex_%s", suffix);
 
-	// sem_empty: inicialmente 1 (variable vacía, escritores pueden escribir)
-	// sem_full: inicialmente 0 (no hay valor, lectores deben esperar)
-	// sem_mutex: inicialmente 1 (mutex libre)
-	if (my_sem_open(sem_empty, 1) < 0) {
-		printf("Error: no se pudo crear el semaforo empty.\n");
+
+	if (my_sem_open(slots, 1) < 0) {
+		printf("Error: no se pudo crear el semaforo slots.\n");
 		return CMD_ERROR;
 	}
 
-	if (my_sem_open(sem_full, 0) < 0) {
-		printf("Error: no se pudo crear el semaforo full.\n");
-		my_sem_close(sem_empty);
+	if (my_sem_open(items, 0) < 0) {
+		printf("Error: no se pudo crear el semaforo items.\n");
+		my_sem_close(slots);
 		return CMD_ERROR;
 	}
 
-	if (my_sem_open(sem_mutex, 1) < 0) {
+	if (my_sem_open(mutex, 1) < 0) {
 		printf("Error: no se pudo crear el semaforo mutex.\n");
-		my_sem_close(sem_empty);
-		my_sem_close(sem_full);
+		my_sem_close(slots);
+		my_sem_close(items);
 		return CMD_ERROR;
 	}
 
 	uint64_t pipe_id = pipe_create();
 	if (pipe_id == 0) {
 		printf("Error: no se pudo crear el pipe.\n");
-		my_sem_close(sem_empty);
-		my_sem_close(sem_full);
-		my_sem_close(sem_mutex);
+		my_sem_close(slots);
+		my_sem_close(items);
+		my_sem_close(mutex);
 		return CMD_ERROR;
 	}
 
@@ -107,7 +107,7 @@ int mvarCmd(int argc, char *argv[]) {
 	printf("Pipe ID: %llu\n", pipe_id);
 
 	for (int i = 0; i < num_writers; i++) {
-		char **process_argv = (char **) malloc(6 * sizeof(char *));
+		char **process_argv = (char **) malloc(7 * sizeof(char *));
 		if (process_argv == NULL) {
 			printf("Error: no se pudo asignar memoria para escritor %d.\n", i);
 			continue;
@@ -118,11 +118,10 @@ int mvarCmd(int argc, char *argv[]) {
 			free(process_argv);
 			continue;
 		}
-		process_argv[0][0] = 'A' + i;
+		process_argv[0][0] = 'A' + (i % 26);
 		process_argv[0][1] = '\0';
 
-		// Argumento 1: sem_empty
-		int len = strlen(sem_empty);
+		int len = strlen(slots);
 		process_argv[1] = (char *) malloc(len + 1);
 		if (process_argv[1] == NULL) {
 			free(process_argv[0]);
@@ -130,10 +129,9 @@ int mvarCmd(int argc, char *argv[]) {
 			continue;
 		}
 		for (int j = 0; j <= len; j++)
-			process_argv[1][j] = sem_empty[j];
+			process_argv[1][j] = slots[j];
 
-		// Argumento 2: sem_full
-		len = strlen(sem_full);
+		len = strlen(items);
 		process_argv[2] = (char *) malloc(len + 1);
 		if (process_argv[2] == NULL) {
 			free(process_argv[0]);
@@ -142,10 +140,9 @@ int mvarCmd(int argc, char *argv[]) {
 			continue;
 		}
 		for (int j = 0; j <= len; j++)
-			process_argv[2][j] = sem_full[j];
+			process_argv[2][j] = items[j];
 
-		// Argumento 3: sem_mutex
-		len = strlen(sem_mutex);
+		len = strlen(mutex);
 		process_argv[3] = (char *) malloc(len + 1);
 		if (process_argv[3] == NULL) {
 			free(process_argv[0]);
@@ -155,9 +152,8 @@ int mvarCmd(int argc, char *argv[]) {
 			continue;
 		}
 		for (int j = 0; j <= len; j++)
-			process_argv[3][j] = sem_mutex[j];
+			process_argv[3][j] = mutex[j];
 
-		// Argumento 4: pipe_id 
 		process_argv[4] = (char *) malloc(32);
 		if (process_argv[4] == NULL) {
 			free(process_argv[0]);
@@ -169,24 +165,37 @@ int mvarCmd(int argc, char *argv[]) {
 		}
 		sprintf(process_argv[4], "%llu", pipe_id);
 
-		process_argv[5] = NULL;
+		int delay = 2 + (i % 3);
+		process_argv[5] = (char *) malloc(12);
+		if (process_argv[5] == NULL) {
+			free(process_argv[0]);
+			free(process_argv[1]);
+			free(process_argv[2]);
+			free(process_argv[3]);
+			free(process_argv[4]);
+			free(process_argv);
+			continue;
+		}
+		sprintf(process_argv[5], "%d", delay);
+
+		process_argv[6] = NULL;
 
 		char name[32];
-		sprintf(name, "writer_%c", 'A' + i);
+		sprintf(name, "mvar_writer");
 
 		int64_t pid = my_create_process(name, mvar_writer_entry, process_argv, 1, 0);
 		if (pid <= 0) {
-			printf("Error: no se pudo crear el escritor %c.\n", 'A' + i);
-			for (int j = 0; j < 5; j++)
+			printf("Error: no se pudo crear el escritor %c.\n", 'A' + (i % 26));
+			for (int j = 0; j < 6; j++)
 				free(process_argv[j]);
 			free(process_argv);
 		}
 	}
 
-	for (int i = 0; i < num_readers; i++) {
-		char **process_argv = (char **) malloc(6 * sizeof(char *));
+	for (int j = 0; j < num_readers; j++) {
+		char **process_argv = (char **) malloc(7 * sizeof(char *));
 		if (process_argv == NULL) {
-			printf("Error: no se pudo asignar memoria para lector %d.\n", i);
+			printf("Error: no se pudo asignar memoria para lector %d.\n", j);
 			continue;
 		}
 
@@ -195,19 +204,19 @@ int mvarCmd(int argc, char *argv[]) {
 			free(process_argv);
 			continue;
 		}
-		sprintf(process_argv[0], "%d", i);
+		sprintf(process_argv[0], "%d", j);
 
-		int len = strlen(sem_empty);
+		int len = strlen(items);
 		process_argv[1] = (char *) malloc(len + 1);
 		if (process_argv[1] == NULL) {
 			free(process_argv[0]);
 			free(process_argv);
 			continue;
 		}
-		for (int j = 0; j <= len; j++)
-			process_argv[1][j] = sem_empty[j];
+		for (int k = 0; k <= len; k++)
+			process_argv[1][k] = items[k];
 
-		len = strlen(sem_full);
+		len = strlen(slots);
 		process_argv[2] = (char *) malloc(len + 1);
 		if (process_argv[2] == NULL) {
 			free(process_argv[0]);
@@ -215,10 +224,10 @@ int mvarCmd(int argc, char *argv[]) {
 			free(process_argv);
 			continue;
 		}
-		for (int j = 0; j <= len; j++)
-			process_argv[2][j] = sem_full[j];
+		for (int k = 0; k <= len; k++)
+			process_argv[2][k] = slots[k];
 
-		len = strlen(sem_mutex);
+		len = strlen(mutex);
 		process_argv[3] = (char *) malloc(len + 1);
 		if (process_argv[3] == NULL) {
 			free(process_argv[0]);
@@ -227,8 +236,8 @@ int mvarCmd(int argc, char *argv[]) {
 			free(process_argv);
 			continue;
 		}
-		for (int j = 0; j <= len; j++)
-			process_argv[3][j] = sem_mutex[j];
+		for (int k = 0; k <= len; k++)
+			process_argv[3][k] = mutex[k];
 
 		process_argv[4] = (char *) malloc(32);
 		if (process_argv[4] == NULL) {
@@ -241,16 +250,29 @@ int mvarCmd(int argc, char *argv[]) {
 		}
 		sprintf(process_argv[4], "%llu", pipe_id);
 
-		process_argv[5] = NULL;
+		int delay = 3 + (j % 3);
+		process_argv[5] = (char *) malloc(12);
+		if (process_argv[5] == NULL) {
+			free(process_argv[0]);
+			free(process_argv[1]);
+			free(process_argv[2]);
+			free(process_argv[3]);
+			free(process_argv[4]);
+			free(process_argv);
+			continue;
+		}
+		sprintf(process_argv[5], "%d", delay);
+
+		process_argv[6] = NULL;
 
 		char name[32];
-		sprintf(name, "reader_%d", i);
+		sprintf(name, "mvar_reader");
 
 		int64_t pid = my_create_process(name, mvar_reader_entry, process_argv, 1, 0);
 		if (pid <= 0) {
-			printf("Error: no se pudo crear el lector %d.\n", i);
-			for (int j = 0; j < 5; j++)
-				free(process_argv[j]);
+			printf("Error: no se pudo crear el lector %d.\n", j);
+			for (int k = 0; k < 6; k++)
+				free(process_argv[k]);
 			free(process_argv);
 		}
 	}
